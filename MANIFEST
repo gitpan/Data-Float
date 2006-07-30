@@ -1,0 +1,8 @@
+.cvsignore
+Changes
+MANIFEST
+META.yml
+Makefile.PL
+README
+lib/Data/Float.pm
+t/use.t
