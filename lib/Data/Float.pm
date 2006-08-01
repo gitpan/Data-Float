@@ -32,16 +32,22 @@ Data::Float - details of the floating point data type
 	($sign, $exponent, $significand) = float_parts($value);
 	print float_hex($value);
 
-	use Data::Float qw(pow2 mult_pow2);
+	use Data::Float qw(pow2 mult_pow2 copysign nextafter);
 
 	$x = pow2($exp);
-	$y = mult_pow2($value, $exp);
+	$x = mult_pow2($value, $exp);
+	$x = copysign($value, $x);
+	$x = nextafter($value, $x);
 
 =head1 DESCRIPTION
 
 This module is about the native floating point numerical data type.
-A floating point number is one of the types of datum that can appear in
-the numeric part of a Perl scalar.
+A floating point number is one of the types of datum that can appear
+in the numeric part of a Perl scalar.  This module supplies constants
+describing the native floating point type, classification functions,
+and functions to manipulate floating point values at a low level.
+
+=head1 FLOATING POINT
 
 Floating point values are divided into five subtypes:
 
@@ -79,13 +85,9 @@ as numerically equal, and they give identical results in most arithmetic
 operations.  They are on opposite sides of some branch cuts in complex
 arithmetic.
 
-Beware that as of Perl 5.8.7 Perl will lose the sign of a zero if it is
-used in any arithmetic, including numerical comparisons; only numerically
-unused zeroes retain their sign.  If the string portion of the scalar is
-generated from the numerical part then it reflects the sign of the zero
-at the time of the first stringification.  Subsequent stringifications
-return the same string even if the numeric portion has lost its sign in
-the intervening time.
+Beware that as of Perl 5.8.7 Perl will lose the sign of a zero for some
+purposes if it is used in any arithmetic, including numerical comparisons.
+Stringification of a zero is inconsistent in whether it shows the sign.
 
 =item infinite
 
@@ -121,14 +123,14 @@ use strict;
 
 use Carp qw(croak);
 
-our $VERSION = "0.000";
+our $VERSION = "0.001";
 
 use base "Exporter";
 our @EXPORT_OK = qw(
 	float_class float_is_normal float_is_subnormal float_is_nzfinite
 	float_is_zero float_is_finite float_is_infinite float_is_nan
 	float_sign float_parts float_hex
-	pow2 mult_pow2
+	pow2 mult_pow2 copysign nextafter
 );
 # constant functions get added to @EXPORT_OK later
 
@@ -428,7 +430,7 @@ mk_constant("min_normal", $min_normal);
 # Feature tests.
 #
 
-my $have_signed_zero = -0.0 =~ /\A-/;
+my $have_signed_zero = sprintf("%e", -0.0) =~ /\A-/;
 mk_constant("have_signed_zero", $have_signed_zero);
 my($pos_zero, $neg_zero);
 if($have_signed_zero) {
@@ -582,20 +584,14 @@ sub float_is_nan($) {
 Returns "+" or "-" to indicate the sign of VALUE.  If zero is unsigned
 then it is treated as positive.  C<die>s if VALUE is a NaN.
 
-Currently this is not reliable when applied to zeroes.  In that case
-it operates by stringification, and so may be confused by dualvars and
-by zeroes that have lost their signs following earlier stringification.
-This behaviour may change in the future, especially if Perl gets better
-handling of signed zeroes.
-
 =cut
 
 sub float_sign($) {
 	my($val) = @_;
 	croak "can't get sign of a NaN" if $val != $val;
-	# TODO: for signed zeroes, what happens to a dualvar?  need to extract just the numeric part to stringify, rather than use the string part
-	return have_signed_zero && $val == 0.0 ? $val =~ /\A-/ ? "-" : "+" :
-			$val >= 0.0 ? "+" : "-";
+	return have_signed_zero && $val == 0.0 ?
+		sprintf("%e", $val) =~ /\A-/ ? "-" : "+" :
+		$val >= 0.0 ? "+" : "-";
 }
 
 =item float_parts(VALUE)
@@ -665,9 +661,6 @@ use constant nsigsections => do { use integer; (significand_bits + 27) / 28; };
 use constant nsighexdigits => (significand_bits + 3) >> 2;
 sub float_hex($) {
 	my($val) = @_;
-	# Stringify first, because of a Perl bug (#39875) which causes a zero
-	# to lose its signedness if numerically compared.
-	{ no warnings "void"; "$val"; }
 	return float_sign($val)."0.0" if $val == 0.0;
 	return "nan" if $val != $val;
 	if(have_infinite) {
@@ -710,14 +703,71 @@ VALUE by two to the power EXP.  This gives exact results, except in
 cases of underflow and overflow.  The range of EXP is not constrained.
 All normal floating point multiplication behaviour applies.
 
+=item copysign(VALUE, SIGN_FROM)
+
+VALUE and SIGN_FROM must both be floating point values.  Returns a
+floating point value with the magnitude of VALUE and the sign of
+SIGN_FROM.  If SIGN_FROM is an unsigned zero then it is treated as
+positive.  If VALUE is an unsigned zero then it is returned unchanged.
+If VALUE is a NaN then it is returned unchanged.  If SIGN_FROM is a NaN
+then the function C<die>s.
+
+=cut
+
+sub copysign($$) {
+	my($val, $signfrom) = @_;
+	return $val if $val != $val;
+	$val = -$val if float_sign($val) ne float_sign($signfrom);
+	return $val;
+}
+
+=item nextafter(VALUE, DIRECTION)
+
+Returns the next representable floating point value adjacent to VALUE
+in the direction of DIRECTION.  Returns a NaN if either argument
+is a NaN, and returns VALUE unchanged if it is numerically equal
+to DIRECTION.  Infinite values are regarded as being adjacent to the
+largest representable finite values.  Zero counts as one value, even if
+it is signed, and it is adjacent to the positive and negative smallest
+representable finite values.  If a zero is returned and zeroes are signed
+then it has the same sign as VALUE.
+
+=cut
+
+sub nextafter($$) {
+	my($val, $dir) = @_;
+	return $val if $val != $val;
+	return $dir if $dir != $dir;
+	return $val if $val == $dir;
+	return $dir > 0.0 ? min_finite : -(min_finite) if $val == 0.0;
+	return copysign(max_finite, $val) if float_is_infinite($val);
+	my($sign, $exp, $significand) = float_parts($val);
+	if(float_sign($dir) eq $sign && abs($dir) > abs($val)) {
+		$significand += significand_step;
+		if($significand == 2.0) {
+			return $dir if $exp == max_finite_exp;
+			$significand = 1.0;
+			$exp++;
+		}
+	} else {
+		if($significand == 1.0 && $exp != min_normal_exp) {
+			$significand = 2.0;
+			$exp--;
+		}
+		$significand -= significand_step;
+	}
+	return copysign(mult_pow2($significand, $exp), $val);
+}
+
 =back
 
 =head1 BUGS
 
 Perl (as of version 5.8.7) doesn't reliably maintain the sign of a zero.
-All handling of the sign of zeroes in this module is a bit screwy as
-a result.  Avoid relying on correct signed-zero handling, even if you
-know your hardware handles it correctly.
+The functions in this module all handle the sign of a zero correctly if it
+is present, but they can't rescue the sign if it has already been lost.
+Avoid relying on correct signed-zero handling, even if you know your
+hardware handles it correctly.
 
 NaN handling is generally not well defined in Perl.  Arithmetic with
 a mathematically undefined result may either C<die> or generate a NaN.

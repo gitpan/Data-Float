@@ -1,3 +1,11 @@
+version 0.001; 2006-08-01
+
+  * add IEEE 754 functions copysign() and nextafter()
+
+  * test sign of zero using sprintf() to avoid being confused by dualvars
+
+  * slight expansion of initial paragraph of documentation
+
 version 0.000; 2006-07-30
 
   * initial released version
