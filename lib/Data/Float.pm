@@ -123,7 +123,7 @@ use strict;
 
 use Carp qw(croak);
 
-our $VERSION = "0.001";
+our $VERSION = "0.002";
 
 use base "Exporter";
 our @EXPORT_OK = qw(
@@ -284,6 +284,7 @@ my @powhalf = (0.5);
 
 sub mult_pow2($$) {
 	my($value, $exp) = @_;
+	return $_[0] if $value == 0.0;
 	my $powa = \@powtwo;
 	if($exp < 0) {
 		$powa = \@powhalf;
@@ -716,7 +717,7 @@ then the function C<die>s.
 
 sub copysign($$) {
 	my($val, $signfrom) = @_;
-	return $val if $val != $val;
+	return $val if float_is_nan($val);
 	$val = -$val if float_sign($val) ne float_sign($signfrom);
 	return $val;
 }
@@ -738,7 +739,7 @@ sub nextafter($$) {
 	my($val, $dir) = @_;
 	return $val if $val != $val;
 	return $dir if $dir != $dir;
-	return $val if $val == $dir;
+	return $_[0] if $val == $dir;
 	return $dir > 0.0 ? min_finite : -(min_finite) if $val == 0.0;
 	return copysign(max_finite, $val) if float_is_infinite($val);
 	my($sign, $exp, $significand) = float_parts($val);

@@ -1,3 +1,10 @@
+version 0.002; 2006-08-03
+
+  * bugfix: in mult_pow2(), copysign(), and nextafter(), take care
+    to return a pristine signed zero when returning zero: they were
+    returning zeroes that got broken (due to the Perl bug noted in the
+    documentation) by internal arithmetic
+
 version 0.001; 2006-08-01
 
   * add IEEE 754 functions copysign() and nextafter()
