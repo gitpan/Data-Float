@@ -123,7 +123,7 @@ use strict;
 
 use Carp qw(croak);
 
-our $VERSION = "0.002";
+our $VERSION = "0.003";
 
 use base "Exporter";
 our @EXPORT_OK = qw(
@@ -177,8 +177,8 @@ point values.
 
 =item significand_step
 
-The difference between adjacent representable values in the range [1, 2].
-This is equal to 2^-significand_bits.
+The difference between adjacent representable values in the range [1, 2]
+(where the exponent is zero).  This is equal to 2^-significand_bits.
 
 =item max_finite_exp
 
@@ -450,14 +450,23 @@ my($have_infinite, $pos_infinity, $neg_infinity);
 	}
 }
 
-my $nan;
-eval 'local $SIG{__DIE__}; die unless $have_infinite;
-		$nan = $pos_infinity/$pos_infinity; 1' or
-	eval 'local $SIG{__DIE__}; $nan = log(-1.0); 1' or
-	eval 'local $SIG{__DIE__}; $nan = 0.0/0.0; 1';
-my $have_nan = defined($nan);
+my($have_nan, $nan);
+foreach my $nan_formula (
+		'$have_infinite && $pos_infinity/$pos_infinity',
+		'log(-1.0)',
+		'0.0/0.0',
+		'"nan"') {
+	my $maybe_nan =
+		eval 'local $SIG{__DIE__}; local $SIG{__WARN__} = sub { }; '.
+		     $nan_formula;
+	if(do { local $SIG{__WARN__} = sub { }; $maybe_nan != $maybe_nan }) {
+		$have_nan = 1;
+		$nan = $maybe_nan;
+		mk_constant("nan", $nan);
+		last;
+	}
+}
 mk_constant("have_nan", $have_nan);
-mk_constant("nan", $nan) if $have_nan;
 
 # The rest of the code is parsed after the constants have been calculated
 # and installed, so that it can benefit from their constancy.
@@ -640,49 +649,251 @@ sub float_parts($) {
 	return ($sign, $exp, $val);
 }
 
-=item float_hex(VALUE)
+=item float_hex(VALUE[, OPTIONS])
 
-Encodes the exact value of VALUE as a hexadecimal fraction, returning the
-fraction as a string.  Specifically, for finite values the output is of
-the form "I<s>B<0x>I<m>B<.>I<fffff>B<p>I<eee>", where "I<s>" is the sign,
-"I<m>" is the integral part of the significand ("1" for normals and "0"
-for subnormals), "I<fffff>" is the fractional part of the significand
-in hexadecimal, and "I<eee>" is the exponent in decimal with a sign.
-The number of significand fraction digits is constant, being just
-sufficient to represent all the bits of the significand.
+Encodes the exact value of VALUE as a hexadecimal fraction, returning
+the fraction as a string.  Specifically, for finite values the output is
+of the form "I<s>B<0x>I<m>B<.>I<mmmmm>B<p>I<eee>", where "I<s>" is the
+sign, "I<m>B<.>I<mmmm>" is the significand in hexadecimal, and "I<eee>"
+is the exponent in decimal with a sign.
 
-Zeros are encoded as "+0.0" and "-0.0", with the same unreliability
-noted above for C<float_sign>.  If zero is unsigned then it is encoded as
-"+0.0".  Infinities are encoded as "+inf" and "-inf".  NaNs are encoded as
-"nan".
+The details of the output format are very configurable.  If OPTIONS
+is supplied, it must be a reference to a hash, in which these keys may
+be present:
+
+=over
+
+=item B<exp_digits>
+
+The number of digits of exponent to show, unless this is modified by
+B<exp_digits_range_mod> or more are required to show the exponent exactly.
+(The exponent is always shown in full.)  Default 0, so the minimum
+possible number of digits is used.
+
+=item B<exp_digits_range_mod>
+
+Modifies the number of exponent digits to show, based on the number of
+digits required to show the full range of exponents for normalised and
+subnormal values.  If "B<IGNORE>" then nothing is done.  If "B<ATLEAST>"
+then at least this many digits are shown.  Default "B<IGNORE>".
+
+=item B<exp_neg_sign>
+
+The string that is prepended to a negative exponent.  Default "B<->".
+
+=item B<exp_pos_sign>
+
+The string that is prepended to a non-negative exponent.  Default "B<+>".
+Make it the empty string to suppress the positive sign.
+
+=item B<frac_digits>
+
+The number of fractional digits to show, unless this is modified by
+B<frac_digits_bits_mod> or B<frac_digits_value_mod>.  Default 0, but by
+default this gets modified.
+
+=item B<frac_digits_bits_mod>
+
+Modifies the number of fractional digits to show, based on the length of
+the significand.  There is a certain number of digits that is the minimum
+required to explicitly state every bit that is stored, and the number
+of digits to show might get set to that number depending on this option.
+If "B<IGNORE>" then nothing is done.  If "B<ATLEAST>" then at least this
+many digits are shown.  If "B<ATMOST>" then at most this many digits
+are shown.  If "B<EXACTLY>" then exactly this many digits are shown.
+Default "B<ATLEAST>".
+
+=item B<frac_digits_value_mod>
+
+Modifies the number of fractional digits to show, based on the number
+of digits required to show the actual value exactly.  Works the same
+way as B<frac_digits_bits_mod>.  Default "B<ATLEAST>".
+
+=item B<infinite_string>
+
+The string that is returned for an infinite magnitude.  Default "B<inf>".
+
+=item B<nan_string>
+
+The string that is returned for a NaN value.  Default "B<nan>".
+
+=item B<neg_sign>
+
+The string that is prepended to a negative value (including negative
+zero).  Default "B<->".
+
+=item B<pos_sign>
+
+The string that is prepended to a positive value (including positive or
+unsigned zero).  Default "B<+>".  Make it the empty string to suppress
+the positive sign.
+
+=item B<subnormal_strategy>
+
+The manner in which subnormal values are displayed.  If "B<SUBNORMAL>",
+they are shown with the minimum exponent for normalised values and
+a significand in the range (0, 1).  This matches how they are stored
+internally.  If "B<NORMAL>", they are shown with a significand in the
+range [1, 2) and a lower exponent, as if they were normalised.  This gives
+a consistent appearance for magnitudes regardless of normalisation.
+Default "B<SUBNORMAL>".
+
+=item B<zero_strategy>
+
+The manner in which zero values are displayed.  If "B<STRING=>I<str>", the
+string I<str> is used.  If "B<SUBNORMAL>", it is shown with significand
+zero and the minimum normalised exponent.  If "B<EXPONENT=>I<exp>", it is
+shown with significand zero and exponent I<exp>.  Default "B<STRING=0.0>".
+
+=back
 
 =cut
 
-use constant nsigsections => do { use integer; (significand_bits + 27) / 28; };
-use constant nsighexdigits => (significand_bits + 3) >> 2;
-sub float_hex($) {
-	my($val) = @_;
-	return float_sign($val)."0.0" if $val == 0.0;
-	return "nan" if $val != $val;
+my %float_hex_defaults = (
+	infinite_string => "inf",
+	nan_string => "nan",
+	exp_neg_sign => "-",
+	exp_pos_sign => "+",
+	pos_sign => "+",
+	neg_sign => "-",
+	subnormal_strategy => "SUBNORMAL",
+	zero_strategy => "STRING=0.0",
+	frac_digits => 0,
+	frac_digits_bits_mod => "ATLEAST",
+	frac_digits_value_mod => "ATLEAST",
+	exp_digits => 0,
+	exp_digits_range_mod => "IGNORE",
+);
+
+sub float_hex_option($$) {
+	my($options, $name) = @_;
+	my $val = defined($options) ? $options->{$name} : undef;
+	return defined($val) ? $val : $float_hex_defaults{$name};
+}
+
+use constant exp_digits_range => do {
+	my $minexp = min_normal_exp - significand_bits;
+	my $maxexp = max_finite_exp + 1;
+	my $len_minexp = length(-$minexp);
+	my $len_maxexp = length($maxexp);
+	$len_minexp > $len_maxexp ? $len_minexp : $len_maxexp;
+};
+use constant frac_digits_bits => (significand_bits + 3) >> 2;
+use constant frac_sections => do { use integer; (frac_digits_bits + 6) / 7; };
+
+sub float_hex($;$) {
+	my($val, $options) = @_;
+	return float_hex_option($options, "nan_string") if $val != $val;
 	if(have_infinite) {
+		my $inf_sign;
 		if($val == $pos_infinity) {
-			return "+inf";
+			$inf_sign = float_hex_option($options, "pos_sign");
+			EMIT_INFINITY:
+			return $inf_sign.
+				float_hex_option($options, "infinite_string");
 		} elsif($val == $neg_infinity) {
-			return "-inf";
+			$inf_sign = float_hex_option($options, "neg_sign");
+			goto EMIT_INFINITY;
 		}
 	}
-	my($sign, $exp, $significand) = float_parts($val);
-	my $firstdigit = int($significand);
-	$significand -= $firstdigit;
-	my $digits = "";
-	for(my $i = nsigsections; $i--; ) {
-		$significand *= 268435456.0;
-		my $section = int($significand);
-		$digits .= sprintf("%07x", $section);
-		$significand -= $section;
+	my($sign, $exp, $sgnf);
+	if($val == 0.0) {
+		$sign = float_sign($val);
+		my $strat = float_hex_option($options, "zero_strategy");
+		if($strat =~ /\ASTRING=(.*)\z/s) {
+			my $string = $1;
+			return float_hex_option($options,
+				    $sign eq "-" ? "neg_sign" : "pos_sign").
+				$string;
+		} elsif($strat eq "SUBNORMAL") {
+			$exp = min_normal_exp;
+		} elsif($strat =~ /\AEXPONENT=([-+]?\d+)\z/) {
+			$exp = $1;
+		} else {
+			croak "unrecognised zero strategy `$strat'";
+		}
+		$sgnf = 0.0;
+	} else {
+		($sign, $exp, $sgnf) = float_parts($val);
 	}
-	substr $digits, nsighexdigits, 7, "";
-	return sprintf("%s0x%d.%sp%+d", $sign, $firstdigit, $digits, $exp);
+	my $digits = int($sgnf);
+	if($digits eq "0" && $sgnf != 0.0) {
+		my $strat = float_hex_option($options, "subnormal_strategy");
+		if($strat eq "NORMAL") {
+			my $add_exp;
+			(undef, $add_exp, $sgnf) = float_parts($sgnf);
+			$exp += $add_exp;
+			$digits = "1";
+		} elsif($strat eq "SUBNORMAL") {
+			# do nothing extra
+		} else {
+			croak "unrecognised subnormal strategy `$strat'";
+		}
+	}
+	$sgnf -= $digits;
+	for(my $i = frac_sections; $i--; ) {
+		$sgnf *= 268435456.0;
+		my $section = int($sgnf);
+		$digits .= sprintf("%07x", $section);
+		$sgnf -= $section;
+	}
+	$digits =~ s/(.)0+\z/$1/;
+	my $ndigits = 1 + float_hex_option($options, "frac_digits");
+	croak "negative number of digits requested" if $ndigits <= 0;
+	my $mindigits = 1;
+	my $maxdigits = $ndigits + frac_digits_bits;
+	foreach my $constraint (["frac_digits_bits_mod", 1+frac_digits_bits],
+				["frac_digits_value_mod", length($digits)]) {
+		my($optname, $number) = @$constraint;
+		my $mod = float_hex_option($options, $optname);
+		if($mod =~ /\A(?:ATLEAST|EXACTLY)\z/) {
+			$mindigits = $number if $mindigits < $number;
+		}
+		if($mod =~ /\A(?:ATMOST|EXACTLY)\z/) {
+			$maxdigits = $number if $maxdigits > $number;
+		}
+		croak "unrecognised length modification setting `$mod'"
+			unless $mod =~ /\A(?:AT(?:MO|LEA)ST|EXACTLY|IGNORE)\z/;
+	}
+	croak "incompatible length constraints" if $maxdigits < $mindigits;
+	$ndigits = $ndigits < $mindigits ? $mindigits :
+			$ndigits > $maxdigits ? $maxdigits : $ndigits;
+	if($ndigits > length($digits)) {
+		$digits .= "0" x ($ndigits - length($digits));
+	} elsif($ndigits < length($digits)) {
+		my $chopped = substr($digits, $ndigits, length($digits), "");
+		if($chopped =~ /\A[89abcdef]/ &&
+				!($chopped =~ /\A80*\z/ &&
+				  $digits =~ /[02468ace]\z/)) {
+			for(my $i = length($digits) - 1; ; ) {
+				my $d = substr($digits, $i, 1);
+				$d =~ tr/0-9a-f/1-9a-f0/;
+				substr($digits, $i, 1, $d);
+				last unless $d eq "0";
+			}
+			if($digits =~ /\A2/) {
+				$exp++;
+				substr($digits, 0, 1, "1");
+			}
+		}
+	}
+	my $nexpdigits = float_hex_option($options, "exp_digits");
+	my $mod = float_hex_option($options, "exp_digits_range_mod");
+	if($mod eq "ATLEAST") {
+		$nexpdigits = exp_digits_range
+			if $nexpdigits < exp_digits_range;
+	} elsif($mod ne "IGNORE") {
+		croak "unrecognised exponent length ".
+			"modification setting `$mod'";
+	}
+	$digits =~ s/\A(.)(.)/$1.$2/;
+	return sprintf("%s0x%sp%s%0*d",
+		float_hex_option($options,
+			$sign eq "-" ? "neg_sign" : "pos_sign"),
+		$digits,
+		float_hex_option($options,
+			$exp < 0 ? "exp_neg_sign" : "exp_pos_sign"),
+		$nexpdigits, abs($exp));
 }
 
 =back

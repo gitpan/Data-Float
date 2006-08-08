@@ -1,3 +1,12 @@
+version 0.003; 2006-08-08
+
+  * float_hex(): add OPTIONS parameter to control details of output
+    formatting
+
+  * when looking for NaNs, see whether the string "nan" qualifies
+
+  * slight clarification to documentation of significand_step
+
 version 0.002; 2006-08-03
 
   * bugfix: in mult_pow2(), copysign(), and nextafter(), take care
