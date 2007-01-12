@@ -1,3 +1,25 @@
+version 0.004; 2007-01-12
+
+  * bugfix: correct value for max_integer to 2^(significand_bits+1),
+    and correct its description in the documentation
+
+  * make pos_zero and neg_zero constants into non-constant functions
+    that return fresh floating point zeroes, if running on a Perl where
+    floating point zeroes can transmogrify into integer zeroes
+
+  * add float_id_cmp() function for total ordering of floats
+
+  * in documentation, more details of behaviour of zeroes
+
+  * in documentation, discussion of interaction with native integer values
+
+  * in documentation, note truncating behaviour of the % operator
+
+  * in documentation, note the slightly misleading nature of the names
+    "significand_bits" and "max_integer"
+
+  * reference Data::Integer and perlnumber(1) in documentation
+
 version 0.003; 2006-08-08
 
   * float_hex(): add OPTIONS parameter to control details of output

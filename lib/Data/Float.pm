@@ -32,6 +32,10 @@ Data::Float - details of the floating point data type
 	($sign, $exponent, $significand) = float_parts($value);
 	print float_hex($value);
 
+	use Data::Float qw(float_id_cmp);
+
+	@sorted_floats = sort { float_id_cmp($a, $b) } @floats;
+
 	use Data::Float qw(pow2 mult_pow2 copysign nextafter);
 
 	$x = pow2($exp);
@@ -48,6 +52,8 @@ describing the native floating point type, classification functions,
 and functions to manipulate floating point values at a low level.
 
 =head1 FLOATING POINT
+
+=head2 Classification
 
 Floating point values are divided into five subtypes:
 
@@ -85,10 +91,6 @@ as numerically equal, and they give identical results in most arithmetic
 operations.  They are on opposite sides of some branch cuts in complex
 arithmetic.
 
-Beware that as of Perl 5.8.7 Perl will lose the sign of a zero for some
-purposes if it is used in any arithmetic, including numerical comparisons.
-Stringification of a zero is inconsistent in whether it shows the sign.
-
 =item infinite
 
 Some floating point formats include special infinite values.  These are
@@ -114,6 +116,42 @@ rather than returning a NaN.
 
 =back
 
+=head2 Mixing floating point and integer values
+
+Perl does not draw a strong type distinction between native integer
+(see L<Data::Integer>) and native floating point values.  Both types
+of value can be stored in the numeric part of a plain (string) scalar.
+No distinction is made between the integer representation and the floating
+point representation where they encode identical values.  Thus, for
+floating point arithmetic, native integer values that can be represented
+exactly in floating point may be freely used as floating point values.
+
+Native integer arithmetic has exactly one zero value, which has no sign.
+If the floating point type does not have signed zeroes then the floating
+point and integer zeroes are exactly equivalent.  If the floating point
+type does have signed zeroes then the integer zero can still be used in
+floating point arithmetic, and it behaves as an unsigned floating point
+zero.  On such systems there are therefore three types of zero available.
+There is a bug in Perl which sometimes causes floating point zeroes to
+change into integer zeroes; see L</BUGS> for details.
+
+Where a native integer value is used that is too large to exactly
+represent in floating point, it will be rounded as necessary to a
+floating point value.  This rounding will occur whenever an operation
+has to be performed in floating point because the result could not be
+exactly represented as an integer.  This may be confusing to functions
+that expect a floating point argument.
+
+Similarly, some operations on floating point numbers will actually be
+performed in integer arithmetic, and may result in values that cannot
+be exactly represented in floating point.  This happens whenever the
+arguments have integer values that fit into the native integer type and
+the mathematical result can be exactly represented as a native integer.
+This may be confusing in cases where floating point semantics are
+expected.
+
+See L<perlnumber(1)> for discussion of Perl's numeric semantics.
+
 =cut
 
 package Data::Float;
@@ -123,13 +161,14 @@ use strict;
 
 use Carp qw(croak);
 
-our $VERSION = "0.003";
+our $VERSION = "0.004";
 
 use base "Exporter";
 our @EXPORT_OK = qw(
 	float_class float_is_normal float_is_subnormal float_is_nzfinite
 	float_is_zero float_is_finite float_is_infinite float_is_nan
 	float_sign float_parts float_hex
+	float_id_cmp
 	pow2 mult_pow2 copysign nextafter
 );
 # constant functions get added to @EXPORT_OK later
@@ -143,8 +182,9 @@ our @EXPORT_OK = qw(
 =item have_signed_zero
 
 Boolean indicating whether floating point zeroes carry a sign.  If yes,
-then there are two zero values: +0.0 and -0.0.  If no, then there is
-only one zero value, considered unsigned.
+then there are two floating point zero values: +0.0 and -0.0.  (Perl
+scalars can nevertheless also hold an integer zero, which is unsigned.)
+If no, then there is only one zero value, which is unsigned.
 
 =item have_subnormal
 
@@ -173,7 +213,9 @@ is the availability of the C<nan> constant below.
 =item significand_bits
 
 The number of fractional bits in the significand of finite floating
-point values.
+point values.  The significand also has an implicit integer bit, not
+counted in this constant; the integer bit is always 1 for normalised
+values and always 0 for subnormal values.
 
 =item significand_step
 
@@ -195,8 +237,9 @@ The maximum representable finite value.  This is 2^(max_finite_exp+1)
 
 =item max_integer
 
-The maximum representable integral value.  This is 2^(significand_bits+1)
-- 1.
+The maximum integral value for which all integers from zero to that
+value inclusive are representable.  This is 2^(significand_bits+1).
+The name is somewhat misleading.
 
 =item min_normal_exp
 
@@ -229,10 +272,22 @@ The minimum representable positive finite value.  This is
 The positive zero value.  (Exists only if zeroes are signed, as indicated
 by the C<have_signed_zero> constant.)
 
+If Perl is at risk of transforming floating point zeroes into integer
+zeroes (see L</BUGS>), then this is actually a non-constant function
+that always returns a fresh floating point zero.  Thus the return value
+is always a true floating point zero, regardless of what happened to
+zeroes previously returned.
+
 =item neg_zero
 
 The negative zero value.  (Exists only if zeroes are signed, as indicated
 by the C<have_signed_zero> constant.)
+
+If Perl is at risk of transforming floating point zeroes into integer
+zeroes (see L</BUGS>), then this is actually a non-constant function
+that always returns a fresh floating point zero.  Thus the return value
+is always a true floating point zero, regardless of what happened to
+zeroes previously returned.
 
 =item pos_infinity
 
@@ -399,7 +454,7 @@ my $max_finite = $max_finite_pow2 -
 			pow2($max_finite_exp - $significand_bits - 1);
 $max_finite += $max_finite;
 
-my $max_integer = pow2($significand_bits + 1) - 1.0;
+my $max_integer = pow2($significand_bits + 1);
 
 mk_constant("max_finite", $max_finite);
 mk_constant("max_integer", $max_integer);
@@ -435,8 +490,21 @@ my $have_signed_zero = sprintf("%e", -0.0) =~ /\A-/;
 mk_constant("have_signed_zero", $have_signed_zero);
 my($pos_zero, $neg_zero);
 if($have_signed_zero) {
-	mk_constant("pos_zero", $pos_zero = +0.0);
-	mk_constant("neg_zero", $neg_zero = -0.0);
+	$pos_zero = +0.0;
+	$neg_zero = -0.0;
+	my $tzero = -0.0;
+	{ no warnings "void"; $tzero == $tzero; }
+	if(sprintf("%e", - -$tzero) =~ /\A-/) {
+		mk_constant("pos_zero", $pos_zero);
+		mk_constant("neg_zero", $neg_zero);
+	} else {
+		# Zeroes lose their signedness upon arithmetic operations.
+		# Therefore make the pos_zero and neg_zero functions
+		# return fresh zeroes to avoid trouble.
+		*pos_zero = sub () { my $ret = $pos_zero };
+		*neg_zero = sub () { my $ret = $neg_zero };
+		push @EXPORT_OK, "pos_zero", "neg_zero";
+	}
 }
 
 my($have_infinite, $pos_infinity, $neg_infinity);
@@ -537,8 +605,8 @@ sub float_is_nzfinite($) {
 
 =item float_is_zero(VALUE)
 
-Returns true iff VALUE is a zero.  If zeroes are signed then both signs
-qualify.
+Returns true iff VALUE is a zero.  If zeroes are signed then the sign
+is irrelevant.
 
 =cut
 
@@ -591,8 +659,8 @@ sub float_is_nan($) {
 
 =item float_sign(VALUE)
 
-Returns "+" or "-" to indicate the sign of VALUE.  If zero is unsigned
-then it is treated as positive.  C<die>s if VALUE is a NaN.
+Returns "B<+>" or "B<->" to indicate the sign of VALUE.  An unsigned
+zero returns the sign "B<+>".  C<die>s if VALUE is a NaN.
 
 =cut
 
@@ -740,10 +808,12 @@ Default "B<SUBNORMAL>".
 
 =item B<zero_strategy>
 
-The manner in which zero values are displayed.  If "B<STRING=>I<str>", the
-string I<str> is used.  If "B<SUBNORMAL>", it is shown with significand
-zero and the minimum normalised exponent.  If "B<EXPONENT=>I<exp>", it is
-shown with significand zero and exponent I<exp>.  Default "B<STRING=0.0>".
+The manner in which zero values are displayed.  If "B<STRING=>I<str>",
+the string I<str> is used, preceded by a sign.  If "B<SUBNORMAL>",
+it is shown with significand zero and the minimum normalised exponent.
+If "B<EXPONENT=>I<exp>", it is shown with significand zero and exponent
+I<exp>.  Default "B<STRING=0.0>".  An unsigned zero is treated as having
+a positive sign.
 
 =back
 
@@ -898,6 +968,45 @@ sub float_hex($;$) {
 
 =back
 
+=head2 Comparison
+
+=over
+
+=item float_id_cmp(A, B)
+
+This is a comparison function supplying a total ordering of floating
+point values.  A and B must both be floating point values.  Returns a
+numeric value less than, equal to, or greater than zero, indicating
+whether A is to be sorted before, the same as, or after B.
+
+The ordering is of the identities of floating point values, not their
+numerical values.  If zeroes are signed, then the two types are considered
+to be distinct.  NaNs compare equal to each other, but different from
+all numeric values.  The exact ordering provided is mostly numerical
+order: NaNs come first, followed by negative infinity, then negative
+finite values, then negative zero, then positive (or unsigned) zero,
+then positive finite values, then positive infinity.
+
+In addition to sorting, this function can be useful to check for a zero
+of a particular sign.
+
+=cut
+
+sub float_id_cmp($$) {
+	my($a, $b) = @_;
+	if(float_is_nan($a)) {
+		return float_is_nan($b) ? 0 : -1;
+	} elsif(float_is_nan($b)) {
+		return +1;
+	} elsif(float_is_zero($a) && float_is_zero($b)) {
+		return float_sign($b) cmp float_sign($a);
+	} else {
+		return $a <=> $b;
+	}
+}
+
+=back
+
 =head2 Manipulation
 
 =over
@@ -975,16 +1084,48 @@ sub nextafter($$) {
 
 =head1 BUGS
 
-Perl (as of version 5.8.7) doesn't reliably maintain the sign of a zero.
-The functions in this module all handle the sign of a zero correctly if it
-is present, but they can't rescue the sign if it has already been lost.
-Avoid relying on correct signed-zero handling, even if you know your
-hardware handles it correctly.
+As of Perl 5.8.7 floating point zeroes will be partially transformed into
+integer zeroes if used in almost any arithmetic, including numerical
+comparisons.  Such a transformed zero appears as a floating point zero
+(with its original sign) for some purposes, but behaves as an integer
+zero for other purposes.  Where this happens to a positive zero the
+result is indistinguishable from a true integer zero.  Where it happens
+to a negative zero the result is a fourth type of zero, the existence of
+which is a bug in Perl.  This fourth type of zero will give confusing
+results, and in particular will elicit inconsistent behaviour from the
+functions in this module.
+
+Because of this transforming behaviour, it is best to avoid relying on
+the sign of zeroes.  If you require signed-zero semantics then take
+special care to maintain signedness.  Avoid using a zero directly
+in arithmetic and handle it as a special case.  Any flavour of zero
+can be accurately copied from one scalar to another without affecting
+the original.  The functions in this module all avoid modifying their
+arguments, and where they are meant to return signed zeroes they always
+return a pristine one.
+
+As of Perl 5.8.7 stringification of a floating point zero does not
+preserve its signedness.  The number-to-string-to-number round trip
+turns a positive floating point zero into an integer zero, but accurately
+maintains negative and integer zeroes.  If a negative zero gets partially
+transformed into an integer zero, as described above, the stringification
+that it gets is based on its state at the first occasion on which the
+scalar was stringified.
 
 NaN handling is generally not well defined in Perl.  Arithmetic with
 a mathematically undefined result may either C<die> or generate a NaN.
 Avoid relying on any particular behaviour for such operations, even if
 your hardware's behaviour is known.
+
+As of Perl 5.8.7 the B<%> operator truncates its arguments to integers, if
+the divisor is within the range of the native integer type.  It therefore
+operates correctly on non-integer values only when the divisor is
+very large.
+
+=head1 SEE ALSO
+
+L<Data::Integer>,
+L<perlnumber(1)>
 
 =head1 AUTHOR
 
@@ -992,7 +1133,7 @@ Andrew Main (Zefram) <zefram@fysh.org>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2006 Andrew Main (Zefram) <zefram@fysh.org>
+Copyright (C) 2006, 2007 Andrew Main (Zefram) <zefram@fysh.org>
 
 This module is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
