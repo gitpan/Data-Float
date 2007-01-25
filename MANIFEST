@@ -5,5 +5,5 @@ META.yml
 Makefile.PL
 README
 lib/Data/Float.pm
+t/const.t
 t/id_cmp.t
-t/use.t

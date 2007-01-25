@@ -26,11 +26,16 @@ Data::Float - details of the floating point data type
 	if(float_is_infinite($value)) { ...
 	if(float_is_nan($value)) { ...
 
-	use Data::Float qw(float_sign float_parts float_hex);
+	use Data::Float qw(float_sign signbit float_parts);
 
 	$sign = float_sign($value);
+	$sign_bit = signbit($value);
 	($sign, $exponent, $significand) = float_parts($value);
+
+	use Data::Float qw(float_hex hex_float);
+
 	print float_hex($value);
+	$value = hex_float($string);
 
 	use Data::Float qw(float_id_cmp);
 
@@ -114,6 +119,11 @@ Perl does not always generate NaNs when normal floating point behaviour
 calls for it.  For example, the division C<0.0/0.0> causes an exception
 rather than returning a NaN.
 
+Perl has only (at most) one NaN value, even if the underlying system
+supports different NaNs.  (IEEE 754 arithmetic has NaNs which carry a
+quiet/signal bit, a sign bit (yes, a sign on a not-number), and many
+bits of implementation-defined data.)
+
 =back
 
 =head2 Mixing floating point and integer values
@@ -161,13 +171,14 @@ use strict;
 
 use Carp qw(croak);
 
-our $VERSION = "0.004";
+our $VERSION = "0.005";
 
 use base "Exporter";
 our @EXPORT_OK = qw(
 	float_class float_is_normal float_is_subnormal float_is_nzfinite
 	float_is_zero float_is_finite float_is_infinite float_is_nan
-	float_sign float_parts float_hex
+	float_sign signbit float_parts
+	float_hex hex_float
 	float_id_cmp
 	pow2 mult_pow2 copysign nextafter
 );
@@ -238,8 +249,9 @@ The maximum representable finite value.  This is 2^(max_finite_exp+1)
 =item max_integer
 
 The maximum integral value for which all integers from zero to that
-value inclusive are representable.  This is 2^(significand_bits+1).
-The name is somewhat misleading.
+value inclusive are representable.  Equivalently: the minimum positive
+integral value N for which the value N+1 is not representable.  This is
+2^(significand_bits+1).  The name is somewhat misleading.
 
 =item min_normal_exp
 
@@ -544,11 +556,12 @@ local $SIG{__DIE__};
 
 =head1 FUNCTIONS
 
-Each "float_" function takes a floating point argument to operate on.
-The argument must be a native floating point value, or a native
-integer (which will be silently converted to floating point).  Giving a
-non-numeric argument will cause mayhem.  See L<Params::Classify/is_number>
-for a way to check for numericness.
+Each "float_" function takes a floating point argument to operate on.  The
+argument must be a native floating point value, or a native integer with
+a value that can be represented in floating point.  Giving a non-numeric
+argument will cause mayhem.  See L<Params::Classify/is_number> for a way
+to check for numericness.  Only the numeric value of the scalar is used;
+the string value is completely ignored, so dualvars are not a problem.
 
 =head2 Classification
 
@@ -664,12 +677,29 @@ zero returns the sign "B<+>".  C<die>s if VALUE is a NaN.
 
 =cut
 
+sub signbit($);
+
 sub float_sign($) {
 	my($val) = @_;
 	croak "can't get sign of a NaN" if $val != $val;
-	return have_signed_zero && $val == 0.0 ?
-		sprintf("%e", $val) =~ /\A-/ ? "-" : "+" :
-		$val >= 0.0 ? "+" : "-";
+	return signbit($val) ? "-" : "+";
+}
+
+=item signbit(VALUE)
+
+VALUE must be a floating point value.  Returns the sign bit of VALUE:
+0 if VALUE is positive or a positive or unsigned zero, or 1 if VALUE is
+negative or a negative zero.  Returns an unpredictable value if VALUE
+is a NaN.
+
+This is an IEEE 754 standard function.
+
+=cut
+
+sub signbit($) {
+	my($val) = @_;
+	return (have_signed_zero && $val == 0.0 ?
+		sprintf("%+.f", $val) eq "-0" : $val < 0.0) ? 1 : 0;
 }
 
 =item float_parts(VALUE)
@@ -716,6 +746,12 @@ sub float_parts($) {
 	}
 	return ($sign, $exp, $val);
 }
+
+=back
+
+=head2 String conversion
+
+=over
 
 =item float_hex(VALUE[, OPTIONS])
 
@@ -966,6 +1002,123 @@ sub float_hex($;$) {
 		$nexpdigits, abs($exp));
 }
 
+=item hex_float(STRING)
+
+Generates and returns a floating point value from a string
+encoding it in hexadecimal.  The standard input form is
+"[I<s>]B<0x>I<m>[B<.>I<mmmmm>][B<p>I<eee>]", where "I<s>" is the sign,
+"I<m>[B<.>I<mmmm>]" is a (fractional) hexadecimal number, and "I<eee>"
+an optionally-signed exponent in decimal.  If present, the exponent
+identifies a power of two (not sixteen) by which the given fraction will
+be multiplied.
+
+If the value given in the string cannot be exactly represented in the
+floating point type because it has too many fraction bits, the nearest
+representable value is returned, with ties broken in favour of the value
+with a zero low-order bit.  If the value given is too large to exactly
+represent then an infinity is returned, or the largest finite value if
+there are no infinities.
+
+Additional input formats are accepted for special values.
+"[I<s>]B<inf>" returns an infinity, or C<die>s if there are no infinities.
+"[I<s>]B<nan>" returns a NaN, or C<die>s if there are no NaNs available.
+"I<s>B<0>[B<.0>]", with additional consecutive zero digits allowed before
+or after the point, returns a zero.
+
+All input formats are understood case insensitively.  The function
+correctly interprets all possible outputs from C<float_hex> with default
+settings.
+
+=cut
+
+sub hex_float($) {
+	my($str) = @_;
+	if($str =~ /\A([-+]?)0x([0-9a-f]+)(?:\.([0-9a-f]+)+)?
+		    (?:p([-+]?\d+))?\z/xi) {
+		my($sign, $digits, $frac_digits, $in_exp) = ($1, $2, $3, $4);
+		my $value;
+		$frac_digits = "" unless defined $frac_digits;
+		$in_exp = "0" unless defined $in_exp;
+		$digits .= $frac_digits;
+		$digits =~ s/\A0+//;
+		if($digits eq "") {
+			$value = 0.0;
+			goto GOT_MAG;
+		}
+		my $digit_exp = (length($digits) - length($frac_digits)) * 4;
+		my @limbs;
+		push @limbs, hex($1) while $digits =~ /(.{7})/sgc;
+		push @limbs, hex(substr($1."000000", 0, 7))
+			if $digits =~ /(.+)/sg;
+		my $skip_bits = $limbs[0] < 0x4000000 ?
+			$limbs[0] < 0x2000000 ? 3 : 2 :
+			$limbs[0] < 0x8000000 ? 1 : 0;
+		my $val_exp = $digit_exp - $skip_bits - 1 + $in_exp;
+		my $sig_bits;
+		if($val_exp > max_finite_exp) {
+			$value = have_infinite ? Data::Float::pos_infinity :
+						 max_finite;
+			goto GOT_MAG;
+		} elsif($val_exp < min_finite_exp-1) {
+			$value = 0.0;
+			goto GOT_MAG;
+		} elsif($val_exp < min_normal_exp) {
+			$sig_bits = $val_exp - (min_finite_exp-1);
+		} else {
+			$sig_bits = significand_bits+1;
+		}
+		my $gbit_lpos = do { use integer; ($skip_bits+$sig_bits)/28 };
+		if(@limbs > $gbit_lpos) {
+			my $gbit_bpos = 27 - ($skip_bits + $sig_bits) % 28;
+			my $sbit = 0;
+			while(@limbs > $gbit_lpos+1) {
+				$sbit = 1 if pop(@limbs) != 0;
+			}
+			my $gbit_mask = 1 << $gbit_bpos;
+			my $sbit_mask = $gbit_mask - 1;
+			if($limbs[$gbit_lpos] & $sbit_mask) {
+				$sbit = 1;
+				$limbs[$gbit_lpos] &= ~$sbit_mask;
+			}
+			if($limbs[$gbit_lpos] & $gbit_mask) {
+				unless($sbit) {
+					if($gbit_bpos == 27 &&
+					   $gbit_lpos != 0) {
+						$sbit = $limbs[$gbit_lpos - 1]
+							& 1;
+					} else {
+						$sbit = $limbs[$gbit_lpos] &
+							($gbit_mask << 1);
+					}
+				}
+				if($sbit) {
+					$limbs[$gbit_lpos] += $gbit_mask;
+				} else {
+					$limbs[$gbit_lpos] -= $gbit_mask;
+				}
+			}
+		}
+		$value = 0.0;
+		for(my $i = @limbs; $i--; ) {
+			$value += mult_pow2($limbs[$i], -28*($i+1));
+		}
+		$value = mult_pow2($value, $in_exp + $digit_exp);
+		GOT_MAG:
+		return $sign eq "-" ? -$value : $value;
+	} elsif($str =~ /\A([-+]?)0+(?:\.0+)?\z/) {
+		return my $zero = $1 eq "-" ? -0.0 : +0.0;
+	} elsif($str =~ /\A([-+]?)inf\z/i) {
+		croak "infinite values not available" unless have_infinite;
+		return $1 eq "-" ? Data::Float::neg_infinity :
+				   Data::Float::pos_infinity;
+	} elsif($str =~ /\A([-+]?)nan\z/si) {
+		croak "Nan value not available" unless have_nan;
+		return Data::Float::nan;
+	} else {
+		croak "bad syntax for hexadecimal floating point value";
+	}
+}
+
 =back
 
 =head2 Comparison
@@ -975,9 +1128,9 @@ sub float_hex($;$) {
 =item float_id_cmp(A, B)
 
 This is a comparison function supplying a total ordering of floating
-point values.  A and B must both be floating point values.  Returns a
-numeric value less than, equal to, or greater than zero, indicating
-whether A is to be sorted before, the same as, or after B.
+point values.  A and B must both be floating point values.  Returns -1,
+0, or +1, indicating whether A is to be sorted before, the same as,
+or after B.
 
 The ordering is of the identities of floating point values, not their
 numerical values.  If zeroes are signed, then the two types are considered
@@ -990,6 +1143,13 @@ then positive finite values, then positive infinity.
 In addition to sorting, this function can be useful to check for a zero
 of a particular sign.
 
+This function provides essentially the same capability as the IEEE 754r
+function totalorder().  The interface differs, in that totalorder()
+provides a <= predicate whereas float_id_cmp() provides a Perl-style <=>
+three-way comparison.  They also differ in that totalorder() distinguishes
+different kinds of NaN, whereas float_id_cmp() (like the rest of Perl)
+perceives only one NaN.
+
 =cut
 
 sub float_id_cmp($$) {
@@ -999,7 +1159,7 @@ sub float_id_cmp($$) {
 	} elsif(float_is_nan($b)) {
 		return +1;
 	} elsif(float_is_zero($a) && float_is_zero($b)) {
-		return float_sign($b) cmp float_sign($a);
+		return signbit($b) - signbit($a);
 	} else {
 		return $a <=> $b;
 	}
@@ -1033,25 +1193,29 @@ positive.  If VALUE is an unsigned zero then it is returned unchanged.
 If VALUE is a NaN then it is returned unchanged.  If SIGN_FROM is a NaN
 then the function C<die>s.
 
+This is an IEEE 754 standard function.
+
 =cut
 
 sub copysign($$) {
 	my($val, $signfrom) = @_;
 	return $val if float_is_nan($val);
-	$val = -$val if float_sign($val) ne float_sign($signfrom);
+	$val = -$val if signbit($val) != signbit($signfrom);
 	return $val;
 }
 
 =item nextafter(VALUE, DIRECTION)
 
-Returns the next representable floating point value adjacent to VALUE
-in the direction of DIRECTION.  Returns a NaN if either argument
-is a NaN, and returns VALUE unchanged if it is numerically equal
-to DIRECTION.  Infinite values are regarded as being adjacent to the
-largest representable finite values.  Zero counts as one value, even if
-it is signed, and it is adjacent to the positive and negative smallest
-representable finite values.  If a zero is returned and zeroes are signed
-then it has the same sign as VALUE.
+VALUE and DIRECTION must both be floating point values.  Returns the next
+representable floating point value adjacent to VALUE in the direction of
+DIRECTION.  Returns a NaN if either argument is a NaN, and returns VALUE
+unchanged if it is numerically equal to DIRECTION.  Infinite values are
+regarded as being adjacent to the largest representable finite values.
+Zero counts as one value, even if it is signed, and it is adjacent to
+the positive and negative smallest representable finite values.  If a
+zero is returned and zeroes are signed then it has the same sign as VALUE.
+
+This is an IEEE 754 standard function.
 
 =cut
 
@@ -1125,6 +1289,7 @@ very large.
 =head1 SEE ALSO
 
 L<Data::Integer>,
+L<Scalar::Number>,
 L<perlnumber(1)>
 
 =head1 AUTHOR

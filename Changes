@@ -1,3 +1,40 @@
+version 0.005; 2007-01-25
+
+  * add hex_float() function to input floating point values in hexadecimal
+
+  * add IEEE 754 function signbit()
+
+  * float_id_cmp(): tighten specification of return values to match
+    Perl's <=> operator (actual behaviour always matched the tighter spec,
+    it just wasn't documented and tested)
+
+  * in documentation, note that the string values of float arguments
+    are ignored
+
+  * in documentation, clarify note about implicit conversion of integer
+    to float
+
+  * in documentation, note that both arguments to nextafter() must be
+    floating point values
+
+  * in documentation, note standard nature of signbit(), copysign(),
+    and nextafter()
+
+  * in documentation, note float_id_cmp()'s relation to the IEEE 754r
+    function totalorder()
+
+  * in documentation, note that Perl does not distinguish between
+    different NaNs
+
+  * in documentation, give a second definition of max_integer (equivalent
+    to the first)
+
+  * add test for consistency of constants
+
+  * in documentation, reference Scalar::Number
+
+  * remove now-useless test t/use.t
+
 version 0.004; 2007-01-12
 
   * bugfix: correct value for max_integer to 2^(significand_bits+1),

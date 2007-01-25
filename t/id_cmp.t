@@ -27,11 +27,7 @@ for(my $ia = @values; $ia--; ) {
 			my $b = $values[$ib];
 			skip "special value not available", 1
 				unless defined($a) && defined($b);
-			my $expect = ($ia <=> $ib);
-			my $actual = float_id_cmp($a, $b);
-			ok $expect < 0 && $actual < 0 ||
-				$expect == 0 && $actual == 0 ||
-				$expect > 0 && $actual > 0;
+			is float_id_cmp($a, $b), ($ia <=> $ib);
 		}
 	}
 }
