@@ -37,16 +37,22 @@ Data::Float - details of the floating point data type
 	print float_hex($value);
 	$value = hex_float($string);
 
-	use Data::Float qw(float_id_cmp);
+	use Data::Float qw(float_id_cmp totalorder);
 
 	@sorted_floats = sort { float_id_cmp($a, $b) } @floats;
+	if(totalorder($a, $b)) { ...
 
-	use Data::Float qw(pow2 mult_pow2 copysign nextafter);
+	use Data::Float qw(
+		pow2 mult_pow2 copysign
+		nextup nextdown nextafter
+	);
 
 	$x = pow2($exp);
 	$x = mult_pow2($value, $exp);
-	$x = copysign($value, $x);
-	$x = nextafter($value, $x);
+	$x = copysign($magnitude, $sign_from);
+	$x = nextup($x);
+	$x = nextdown($x);
+	$x = nextafter($x, $direction);
 
 =head1 DESCRIPTION
 
@@ -171,7 +177,7 @@ use strict;
 
 use Carp qw(croak);
 
-our $VERSION = "0.005";
+our $VERSION = "0.006";
 
 use base "Exporter";
 our @EXPORT_OK = qw(
@@ -179,8 +185,8 @@ our @EXPORT_OK = qw(
 	float_is_zero float_is_finite float_is_infinite float_is_nan
 	float_sign signbit float_parts
 	float_hex hex_float
-	float_id_cmp
-	pow2 mult_pow2 copysign nextafter
+	float_id_cmp totalorder
+	pow2 mult_pow2 copysign nextup nextdown nextafter
 );
 # constant functions get added to @EXPORT_OK later
 
@@ -217,7 +223,7 @@ is the availability of the C<nan> constant below.
 
 =back
 
-=head2 Finite Extrema
+=head2 Extrema
 
 =over
 
@@ -245,6 +251,11 @@ The maximum representable power of two.  This is 2^max_finite_exp.
 
 The maximum representable finite value.  This is 2^(max_finite_exp+1)
 - 2^(max_finite_exp-significand_bits).
+
+=item max_number
+
+The maximum representable number.  This is positive infinity if there
+are infinite values, or max_finite if there are not.
 
 =item max_integer
 
@@ -320,7 +331,7 @@ by the C<have_nan> constant.)
 
 =cut
 
-sub mk_constant($$) {
+sub _mk_constant($$) {
 	my($name, $value) = @_;
 	no strict "refs";
 	*{__PACKAGE__."::".$name} = sub () { $value };
@@ -419,10 +430,10 @@ foreach my $direction (@directions) {
 	${$direction->{xpower}} = $extremum;
 }
 
-mk_constant("min_finite_exp", $min_finite_exp);
-mk_constant("min_finite", $min_finite);
-mk_constant("max_finite_exp", $max_finite_exp);
-mk_constant("max_finite_pow2", $max_finite_pow2);
+_mk_constant("min_finite_exp", $min_finite_exp);
+_mk_constant("min_finite", $min_finite);
+_mk_constant("max_finite_exp", $max_finite_exp);
+_mk_constant("max_finite_pow2", $max_finite_pow2);
 
 #
 # pow2() generates a power of two from scratch.  It complains if given
@@ -459,8 +470,8 @@ my($significand_bits, $significand_step);
 	}
 }
 
-mk_constant("significand_bits", $significand_bits);
-mk_constant("significand_step", $significand_step);
+_mk_constant("significand_bits", $significand_bits);
+_mk_constant("significand_step", $significand_step);
 
 my $max_finite = $max_finite_pow2 -
 			pow2($max_finite_exp - $significand_bits - 1);
@@ -468,8 +479,8 @@ $max_finite += $max_finite;
 
 my $max_integer = pow2($significand_bits + 1);
 
-mk_constant("max_finite", $max_finite);
-mk_constant("max_integer", $max_integer);
+_mk_constant("max_finite", $max_finite);
+_mk_constant("max_integer", $max_integer);
 
 #
 # Subnormals.
@@ -482,7 +493,7 @@ my $have_subnormal;
 				$testval == ($min_finite + $min_finite);
 }
 
-mk_constant("have_subnormal", $have_subnormal);
+_mk_constant("have_subnormal", $have_subnormal);
 
 my $min_normal_exp = $have_subnormal ?
 			$min_finite_exp + $significand_bits :
@@ -491,15 +502,15 @@ my $min_normal = $have_subnormal ?
 			mult_pow2($min_finite, $significand_bits) :
 			$min_finite;
 
-mk_constant("min_normal_exp", $min_normal_exp);
-mk_constant("min_normal", $min_normal);
+_mk_constant("min_normal_exp", $min_normal_exp);
+_mk_constant("min_normal", $min_normal);
 
 #
 # Feature tests.
 #
 
 my $have_signed_zero = sprintf("%e", -0.0) =~ /\A-/;
-mk_constant("have_signed_zero", $have_signed_zero);
+_mk_constant("have_signed_zero", $have_signed_zero);
 my($pos_zero, $neg_zero);
 if($have_signed_zero) {
 	$pos_zero = +0.0;
@@ -507,8 +518,8 @@ if($have_signed_zero) {
 	my $tzero = -0.0;
 	{ no warnings "void"; $tzero == $tzero; }
 	if(sprintf("%e", - -$tzero) =~ /\A-/) {
-		mk_constant("pos_zero", $pos_zero);
-		mk_constant("neg_zero", $neg_zero);
+		_mk_constant("pos_zero", $pos_zero);
+		_mk_constant("neg_zero", $neg_zero);
 	} else {
 		# Zeroes lose their signedness upon arithmetic operations.
 		# Therefore make the pos_zero and neg_zero functions
@@ -523,12 +534,15 @@ my($have_infinite, $pos_infinity, $neg_infinity);
 {
 	my $testval = $max_finite * $max_finite;
 	$have_infinite = $testval == $testval && $testval != $max_finite;
-	mk_constant("have_infinite", $have_infinite);
+	_mk_constant("have_infinite", $have_infinite);
 	if($have_infinite) {
-		mk_constant("pos_infinity", $pos_infinity = $testval);
-		mk_constant("neg_infinity", $neg_infinity = -$testval);
+		_mk_constant("pos_infinity", $pos_infinity = $testval);
+		_mk_constant("neg_infinity", $neg_infinity = -$testval);
 	}
 }
+
+my $max_number = $have_infinite ? $pos_infinity : $max_finite;
+_mk_constant("max_number", $max_number);
 
 my($have_nan, $nan);
 foreach my $nan_formula (
@@ -542,11 +556,11 @@ foreach my $nan_formula (
 	if(do { local $SIG{__WARN__} = sub { }; $maybe_nan != $maybe_nan }) {
 		$have_nan = 1;
 		$nan = $maybe_nan;
-		mk_constant("nan", $nan);
+		_mk_constant("nan", $nan);
 		last;
 	}
 }
-mk_constant("have_nan", $have_nan);
+_mk_constant("have_nan", $have_nan);
 
 # The rest of the code is parsed after the constants have been calculated
 # and installed, so that it can benefit from their constancy.
@@ -692,7 +706,8 @@ VALUE must be a floating point value.  Returns the sign bit of VALUE:
 negative or a negative zero.  Returns an unpredictable value if VALUE
 is a NaN.
 
-This is an IEEE 754 standard function.
+This is an IEEE 754 standard function.  According to the standard NaNs
+have a well-behaved sign bit, but Perl can't see that bit.
 
 =cut
 
@@ -813,6 +828,11 @@ Modifies the number of fractional digits to show, based on the number
 of digits required to show the actual value exactly.  Works the same
 way as B<frac_digits_bits_mod>.  Default "B<ATLEAST>".
 
+=item B<hex_prefix_string>
+
+The string that is prefixed to hexadecimal digits.  Default "B<0x>".
+Make it the empty string to suppress the prefix.
+
 =item B<infinite_string>
 
 The string that is returned for an infinite magnitude.  Default "B<inf>".
@@ -862,6 +882,7 @@ my %float_hex_defaults = (
 	exp_pos_sign => "+",
 	pos_sign => "+",
 	neg_sign => "-",
+	hex_prefix_string => "0x",
 	subnormal_strategy => "SUBNORMAL",
 	zero_strategy => "STRING=0.0",
 	frac_digits => 0,
@@ -871,7 +892,7 @@ my %float_hex_defaults = (
 	exp_digits_range_mod => "IGNORE",
 );
 
-sub float_hex_option($$) {
+sub _float_hex_option($$) {
 	my($options, $name) = @_;
 	my $val = defined($options) ? $options->{$name} : undef;
 	return defined($val) ? $val : $float_hex_defaults{$name};
@@ -889,31 +910,31 @@ use constant frac_sections => do { use integer; (frac_digits_bits + 6) / 7; };
 
 sub float_hex($;$) {
 	my($val, $options) = @_;
-	return float_hex_option($options, "nan_string") if $val != $val;
+	return _float_hex_option($options, "nan_string") if $val != $val;
 	if(have_infinite) {
 		my $inf_sign;
 		if($val == $pos_infinity) {
-			$inf_sign = float_hex_option($options, "pos_sign");
+			$inf_sign = _float_hex_option($options, "pos_sign");
 			EMIT_INFINITY:
 			return $inf_sign.
-				float_hex_option($options, "infinite_string");
+				_float_hex_option($options, "infinite_string");
 		} elsif($val == $neg_infinity) {
-			$inf_sign = float_hex_option($options, "neg_sign");
+			$inf_sign = _float_hex_option($options, "neg_sign");
 			goto EMIT_INFINITY;
 		}
 	}
 	my($sign, $exp, $sgnf);
 	if($val == 0.0) {
 		$sign = float_sign($val);
-		my $strat = float_hex_option($options, "zero_strategy");
+		my $strat = _float_hex_option($options, "zero_strategy");
 		if($strat =~ /\ASTRING=(.*)\z/s) {
 			my $string = $1;
-			return float_hex_option($options,
+			return _float_hex_option($options,
 				    $sign eq "-" ? "neg_sign" : "pos_sign").
 				$string;
 		} elsif($strat eq "SUBNORMAL") {
 			$exp = min_normal_exp;
-		} elsif($strat =~ /\AEXPONENT=([-+]?\d+)\z/) {
+		} elsif($strat =~ /\AEXPONENT=([-+]?[0-9]+)\z/) {
 			$exp = $1;
 		} else {
 			croak "unrecognised zero strategy `$strat'";
@@ -924,7 +945,7 @@ sub float_hex($;$) {
 	}
 	my $digits = int($sgnf);
 	if($digits eq "0" && $sgnf != 0.0) {
-		my $strat = float_hex_option($options, "subnormal_strategy");
+		my $strat = _float_hex_option($options, "subnormal_strategy");
 		if($strat eq "NORMAL") {
 			my $add_exp;
 			(undef, $add_exp, $sgnf) = float_parts($sgnf);
@@ -944,14 +965,14 @@ sub float_hex($;$) {
 		$sgnf -= $section;
 	}
 	$digits =~ s/(.)0+\z/$1/;
-	my $ndigits = 1 + float_hex_option($options, "frac_digits");
+	my $ndigits = 1 + _float_hex_option($options, "frac_digits");
 	croak "negative number of digits requested" if $ndigits <= 0;
 	my $mindigits = 1;
 	my $maxdigits = $ndigits + frac_digits_bits;
 	foreach my $constraint (["frac_digits_bits_mod", 1+frac_digits_bits],
 				["frac_digits_value_mod", length($digits)]) {
 		my($optname, $number) = @$constraint;
-		my $mod = float_hex_option($options, $optname);
+		my $mod = _float_hex_option($options, $optname);
 		if($mod =~ /\A(?:ATLEAST|EXACTLY)\z/) {
 			$mindigits = $number if $mindigits < $number;
 		}
@@ -983,8 +1004,8 @@ sub float_hex($;$) {
 			}
 		}
 	}
-	my $nexpdigits = float_hex_option($options, "exp_digits");
-	my $mod = float_hex_option($options, "exp_digits_range_mod");
+	my $nexpdigits = _float_hex_option($options, "exp_digits");
+	my $mod = _float_hex_option($options, "exp_digits_range_mod");
 	if($mod eq "ATLEAST") {
 		$nexpdigits = exp_digits_range
 			if $nexpdigits < exp_digits_range;
@@ -993,11 +1014,12 @@ sub float_hex($;$) {
 			"modification setting `$mod'";
 	}
 	$digits =~ s/\A(.)(.)/$1.$2/;
-	return sprintf("%s0x%sp%s%0*d",
-		float_hex_option($options,
+	return sprintf("%s%s%sp%s%0*d",
+		_float_hex_option($options,
 			$sign eq "-" ? "neg_sign" : "pos_sign"),
+		_float_hex_option($options, "hex_prefix_string"),
 		$digits,
-		float_hex_option($options,
+		_float_hex_option($options,
 			$exp < 0 ? "exp_neg_sign" : "exp_pos_sign"),
 		$nexpdigits, abs($exp));
 }
@@ -1006,7 +1028,7 @@ sub float_hex($;$) {
 
 Generates and returns a floating point value from a string
 encoding it in hexadecimal.  The standard input form is
-"[I<s>]B<0x>I<m>[B<.>I<mmmmm>][B<p>I<eee>]", where "I<s>" is the sign,
+"[I<s>][B<0x>]I<m>[B<.>I<mmmmm>][B<p>I<eee>]", where "I<s>" is the sign,
 "I<m>[B<.>I<mmmm>]" is a (fractional) hexadecimal number, and "I<eee>"
 an optionally-signed exponent in decimal.  If present, the exponent
 identifies a power of two (not sixteen) by which the given fraction will
@@ -1020,10 +1042,9 @@ represent then an infinity is returned, or the largest finite value if
 there are no infinities.
 
 Additional input formats are accepted for special values.
-"[I<s>]B<inf>" returns an infinity, or C<die>s if there are no infinities.
-"[I<s>]B<nan>" returns a NaN, or C<die>s if there are no NaNs available.
-"I<s>B<0>[B<.0>]", with additional consecutive zero digits allowed before
-or after the point, returns a zero.
+"[I<s>]B<inf>[B<inity>]" returns an infinity, or C<die>s if there are
+no infinities.  "[I<s>][B<s>]B<nan>" returns a NaN, or C<die>s if there
+are no NaNs available.
 
 All input formats are understood case insensitively.  The function
 correctly interprets all possible outputs from C<float_hex> with default
@@ -1033,8 +1054,8 @@ settings.
 
 sub hex_float($) {
 	my($str) = @_;
-	if($str =~ /\A([-+]?)0x([0-9a-f]+)(?:\.([0-9a-f]+)+)?
-		    (?:p([-+]?\d+))?\z/xi) {
+	if($str =~ /\A([-+]?)(?:0x)?([0-9a-f]+)(?:\.([0-9a-f]+)+)?
+		    (?:p([-+]?[0-9]+))?\z/xi) {
 		my($sign, $digits, $frac_digits, $in_exp) = ($1, $2, $3, $4);
 		my $value;
 		$frac_digits = "" unless defined $frac_digits;
@@ -1105,13 +1126,11 @@ sub hex_float($) {
 		$value = mult_pow2($value, $in_exp + $digit_exp);
 		GOT_MAG:
 		return $sign eq "-" ? -$value : $value;
-	} elsif($str =~ /\A([-+]?)0+(?:\.0+)?\z/) {
-		return my $zero = $1 eq "-" ? -0.0 : +0.0;
-	} elsif($str =~ /\A([-+]?)inf\z/i) {
+	} elsif($str =~ /\A([-+]?)inf(?:inity)?\z/i) {
 		croak "infinite values not available" unless have_infinite;
 		return $1 eq "-" ? Data::Float::neg_infinity :
 				   Data::Float::pos_infinity;
-	} elsif($str =~ /\A([-+]?)nan\z/si) {
+	} elsif($str =~ /\A([-+]?)s?nan\z/si) {
 		croak "Nan value not available" unless have_nan;
 		return Data::Float::nan;
 	} else {
@@ -1143,13 +1162,6 @@ then positive finite values, then positive infinity.
 In addition to sorting, this function can be useful to check for a zero
 of a particular sign.
 
-This function provides essentially the same capability as the IEEE 754r
-function totalorder().  The interface differs, in that totalorder()
-provides a <= predicate whereas float_id_cmp() provides a Perl-style <=>
-three-way comparison.  They also differ in that totalorder() distinguishes
-different kinds of NaN, whereas float_id_cmp() (like the rest of Perl)
-perceives only one NaN.
-
 =cut
 
 sub float_id_cmp($$) {
@@ -1164,6 +1176,25 @@ sub float_id_cmp($$) {
 		return $a <=> $b;
 	}
 }
+
+=item totalorder(A, B)
+
+This is a comparison function supplying a total ordering of floating point
+values.  A and B must both be floating point values.  Returns a boolean
+indicating whether A is to be sorted before-or-the-same-as B.  That is,
+it is a <= predicate on the total ordering.  The ordering is the same as
+that provided by C<float_id_cmp>: NaNs come first, followed by negative
+infinity, then negative finite values, then negative zero, then positive
+(or unsigned) zero, then positive finite values, then positive infinity.
+
+This is an IEEE 754r standard function.  According to the standard it
+is meant to distinguish different kinds of NaNs, based on their sign
+bit, quietness, and payload, but this function (like the rest of Perl)
+perceives only one NaN.
+
+=cut
+
+sub totalorder($$) { float_id_cmp($_[0], $_[1]) <= 0 }
 
 =back
 
@@ -1191,9 +1222,12 @@ floating point value with the magnitude of VALUE and the sign of
 SIGN_FROM.  If SIGN_FROM is an unsigned zero then it is treated as
 positive.  If VALUE is an unsigned zero then it is returned unchanged.
 If VALUE is a NaN then it is returned unchanged.  If SIGN_FROM is a NaN
-then the function C<die>s.
+then the sign copied to VALUE is unpredictable.
 
-This is an IEEE 754 standard function.
+This is an IEEE 754 standard function.  According to the standard NaNs
+have a well-behaved sign bit, which can be read and modified by this
+function, but Perl only perceives one NaN and can't see its sign bit,
+so behaviour on NaNs is not standard-conforming.
 
 =cut
 
@@ -1204,33 +1238,33 @@ sub copysign($$) {
 	return $val;
 }
 
-=item nextafter(VALUE, DIRECTION)
+=item nextup(VALUE)
 
-VALUE and DIRECTION must both be floating point values.  Returns the next
-representable floating point value adjacent to VALUE in the direction of
-DIRECTION.  Returns a NaN if either argument is a NaN, and returns VALUE
-unchanged if it is numerically equal to DIRECTION.  Infinite values are
-regarded as being adjacent to the largest representable finite values.
-Zero counts as one value, even if it is signed, and it is adjacent to
-the positive and negative smallest representable finite values.  If a
-zero is returned and zeroes are signed then it has the same sign as VALUE.
+VALUE must be a floating point value.  Returns the next representable
+floating point value adjacent to VALUE with a numerical value that is
+strictly greater than VALUE, or returns VALUE unchanged if there is
+no such value.  Infinite values are regarded as being adjacent to the
+largest representable finite values.  Zero counts as one value, even if
+it is signed, and it is adjacent to the smallest representable positive
+and negative finite values.  If a zero is returned, because VALUE is
+the smallest representable negative value, and zeroes are signed, it is
+a negative zero that is returned.  Returns NaN if VALUE is a NaN.
 
-This is an IEEE 754 standard function.
+This is an IEEE 754r standard function.
 
 =cut
 
-sub nextafter($$) {
-	my($val, $dir) = @_;
-	return $val if $val != $val;
-	return $dir if $dir != $dir;
-	return $_[0] if $val == $dir;
-	return $dir > 0.0 ? min_finite : -(min_finite) if $val == 0.0;
-	return copysign(max_finite, $val) if float_is_infinite($val);
+sub nextup($) {
+	my($val) = @_;
+	return $val if $val != $val || $val == max_number;
+	return -(max_finite) if have_infinite && $val == -(max_number);
+	return min_finite if $val == 0.0;
 	my($sign, $exp, $significand) = float_parts($val);
-	if(float_sign($dir) eq $sign && abs($dir) > abs($val)) {
+	if($sign eq "+") {
 		$significand += significand_step;
 		if($significand == 2.0) {
-			return $dir if $exp == max_finite_exp;
+			return max_number
+				if have_infinite && $exp == max_finite_exp;
 			$significand = 1.0;
 			$exp++;
 		}
@@ -1242,6 +1276,46 @@ sub nextafter($$) {
 		$significand -= significand_step;
 	}
 	return copysign(mult_pow2($significand, $exp), $val);
+}
+
+=item nextdown(VALUE)
+
+VALUE must be a floating point value.  Returns the next representable
+floating point value adjacent to VALUE with a numerical value that
+is strictly less than VALUE, or returns VALUE unchanged if there is
+no such value.  Infinite values are regarded as being adjacent to the
+largest representable finite values.  Zero counts as one value, even if
+it is signed, and it is adjacent to the smallest representable positive
+and negative finite values.  If a zero is returned, because VALUE is
+the smallest representable positive value, and zeroes are signed, it is
+a positive zero that is returned.  Returns NaN if VALUE is a NaN.
+
+This is an IEEE 754r standard function.
+
+=cut
+
+sub nextdown($) { -nextup(-$_[0]) }
+
+=item nextafter(VALUE, DIRECTION)
+
+VALUE and DIRECTION must both be floating point values.  Returns the
+next representable floating point value adjacent to VALUE in the
+direction of DIRECTION, or returns DIRECTION if it is numerically
+equal to VALUE.  Infinite values are regarded as being adjacent to
+the largest representable finite values.  Zero counts as one value,
+even if it is signed, and it is adjacent to the positive and negative
+smallest representable finite values.  If a zero is returned and zeroes
+are signed then it has the same sign as VALUE.  Returns NaN if either
+argument is a NaN.
+
+This is an IEEE 754 standard function.
+
+=cut
+
+sub nextafter($$) {
+	my($val, $dir) = @_;
+	return $_[1] if $dir != $dir || $val == $dir;
+	return $dir > $val ? nextup($_[0]) : nextdown($_[0]);
 }
 
 =back
@@ -1299,6 +1373,8 @@ Andrew Main (Zefram) <zefram@fysh.org>
 =head1 COPYRIGHT
 
 Copyright (C) 2006, 2007 Andrew Main (Zefram) <zefram@fysh.org>
+
+=head1 LICENSE
 
 This module is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

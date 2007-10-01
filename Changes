@@ -1,4 +1,66 @@
+version 0.006; 2007-10-01
+
+  * bugfix: change behaviour of nextafter() when both arguments are
+    numerically zero to that specified by IEEE 754: the second argument
+    is returned rather than the first
+
+  * bugfix: in hex_float(), cleanly reject non-ASCII digits in exponent
+
+  * bugfix: in float_hex(), cleanly reject non-ASCII digits in an
+    "EXPONENT="-type "zero_strategy" setting
+
+  * add IEEE 754r functions nextup() and nextdown()
+
+  * add IEEE 754r function totalorder()
+
+  * add constant max_number
+
+  * hex_float(): accept IEEE 754r special input strings "infinity" and
+    "snan", in addition to the existing "inf" and "nan"
+
+  * hex_float(): make the "0x" prefix in hexadecimal input optional
+
+  * float_hex(): new option "hex_prefix_string" to control the "0x" prefix
+
+  * test classification functions, examination functions, string
+    conversion functions, and manipulation functions (all the functions
+    that were not being tested)
+
+  * test all functions for lack of side effects on zero arguments and
+    purity of zero results
+
+  * in documentation, note new standard-conforming behaviour of copysign()
+    with a NaN second argument
+
+  * in documentation, note that hex_float() accepts the special "0.0"
+    form of input without a sign, as well as with one
+
+  * in documentation, where the IEEE standard nature of functions is
+    noted, add discussion of non-conforming behaviour on NaNs
+
+  * in documentation, change some variable names in the synopsis for
+    clarity
+
+  * test POD syntax and coverage, and rename some internal functions to
+    satisfy the coverage test
+
+  * tweak tests on constants to avoid infinite loops if importing constant
+    functions fails
+
+  * build with Module::Build instead of ExtUtils::MakeMaker
+
+  * complete dependency list
+
+  * include signature in distribution
+
+  * in documentation, separate "license" section from "copyright" section
+
 version 0.005; 2007-01-25
+
+  * bugfix: change behaviour of copysign() with a NaN as the second
+    argument to that specified by IEEE 754: it is not an error but
+    (in the context of Perl's opaque NaNs) results in copying an
+    unpredictable sign
 
   * add hex_float() function to input floating point values in hexadecimal
 
