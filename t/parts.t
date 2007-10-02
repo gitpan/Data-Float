@@ -6,7 +6,7 @@ BEGIN { use_ok "Data::Float", qw(
 	float_sign signbit float_parts
 ); }
 
-sub zpat($) { sprintf("%+.f%+.f%+.f", $_[0], -$_[0], - -$_[0]) }
+sub zpat($) { my($z) = @_; sprintf("%+.f%+.f%+.f", $z, -$z, - -$z) }
 sub test_sign($$$) {
 	my($val, $sign, $is_zero) = @_;
 	my $tval = $val;

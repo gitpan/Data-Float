@@ -20,7 +20,7 @@ foreach(@values) {
 	$_ = $_->() if ref($_) eq "CODE";
 }
 
-sub zpat($) { sprintf("%+.f%+.f%+.f", $_[0], -$_[0], - -$_[0]) }
+sub zpat($) { my($z) = @_; sprintf("%+.f%+.f%+.f", $z, -$z, - -$z) }
 
 for(my $ia = @values; $ia--; ) {
 	for(my $ib = @values; $ib--; ) {

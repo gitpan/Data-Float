@@ -1,3 +1,9 @@
+version 0.007; 2007-10-02
+
+  * close DATA filehandle when finished reading from it
+
+  * fix some tests that were producing false failures on perl 5.6
+
 version 0.006; 2007-10-01
 
   * bugfix: change behaviour of nextafter() when both arguments are

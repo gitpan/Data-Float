@@ -48,7 +48,7 @@ foreach my $class (keys %values) {
 	} }
 }
 
-sub zpat($) { sprintf("%+.f%+.f%+.f", $_[0], -$_[0], - -$_[0]) }
+sub zpat($) { my($z) = @_; sprintf("%+.f%+.f%+.f", $z, -$z, - -$z) }
 foreach(\&float_class, \&float_is_normal, \&float_is_subnormal,
 	\&float_is_nzfinite, \&float_is_zero, \&float_is_finite,
 	\&float_is_infinite, \&float_is_nan

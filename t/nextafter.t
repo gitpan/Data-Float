@@ -23,7 +23,7 @@ ok nextafter(1.2, 1.2) == 1.2;
 ok nextup(max_number) == max_number;
 ok nextdown(-max_number()) == -max_number();
 
-sub zpat($) { sprintf("%+.f%+.f%+.f", $_[0], -$_[0], - -$_[0]) }
+sub zpat($) { my($z) = @_; sprintf("%+.f%+.f%+.f", $z, -$z, - -$z) }
 my($za, $zb, $r);
 
 if(have_signed_zero) {

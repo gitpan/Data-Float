@@ -177,7 +177,7 @@ use strict;
 
 use Carp qw(croak);
 
-our $VERSION = "0.006";
+our $VERSION = "0.007";
 
 use base "Exporter";
 our @EXPORT_OK = qw(
@@ -564,7 +564,7 @@ _mk_constant("have_nan", $have_nan);
 
 # The rest of the code is parsed after the constants have been calculated
 # and installed, so that it can benefit from their constancy.
-eval do { local $/; <DATA>; } or die $@;
+eval do { local $/ = undef; my $data = <DATA>; close(DATA); $data } or die $@;
 __DATA__
 local $SIG{__DIE__};
 
