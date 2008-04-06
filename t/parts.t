@@ -18,7 +18,7 @@ sub test_sign($$$) {
 }
 test_sign(0, "+", 1);
 SKIP: {
-	skip "no signed zero", 4 unless have_signed_zero;
+	skip "no signed zero", 8 unless have_signed_zero;
 	test_sign(+0.0, "+", 1);
 	test_sign(-0.0, "-", 1);
 }

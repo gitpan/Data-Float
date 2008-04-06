@@ -177,7 +177,7 @@ use strict;
 
 use Carp qw(croak);
 
-our $VERSION = "0.008";
+our $VERSION = "0.009";
 
 use base "Exporter";
 our @EXPORT_OK = qw(
@@ -1088,7 +1088,7 @@ sub hex_float($) {
 		my $val_exp = $digit_exp - $skip_bits - 1 + $in_exp;
 		my $sig_bits;
 		if($val_exp > max_finite_exp) {
-			$value = have_infinite ? Data::Float::pos_infinity :
+			$value = have_infinite ? Data::Float::pos_infinity() :
 						 max_finite;
 			goto GOT_MAG;
 		} elsif($val_exp < min_finite_exp-1) {
@@ -1139,11 +1139,11 @@ sub hex_float($) {
 		return $sign eq "-" ? -$value : $value;
 	} elsif($str =~ /\A([-+]?)inf(?:inity)?\z/i) {
 		croak "infinite values not available" unless have_infinite;
-		return $1 eq "-" ? Data::Float::neg_infinity :
-				   Data::Float::pos_infinity;
+		return $1 eq "-" ? Data::Float::neg_infinity() :
+				   Data::Float::pos_infinity();
 	} elsif($str =~ /\A([-+]?)s?nan\z/si) {
 		croak "Nan value not available" unless have_nan;
-		return Data::Float::nan;
+		return Data::Float::nan();
 	} else {
 		croak "bad syntax for hexadecimal floating point value";
 	}

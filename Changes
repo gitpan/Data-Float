@@ -1,3 +1,11 @@
+version 0.009; 2008-04-06
+
+  * refer to optional constants more carefully in the code, to avoid
+    syntax problems on systems that lack infinities and NaNs
+
+  * fix a skip count that caused false test failures on systems lacking
+    signed zeroes
+
 version 0.008; 2008-04-02
 
   * bugfix: in initialisation, correctly override any ambient
