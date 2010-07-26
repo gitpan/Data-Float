@@ -1,9 +1,13 @@
+use warnings;
+use strict;
+
 use Test::More tests => 1 + 2*9*9 + 8*9;
 
 BEGIN { use_ok "Data::Float", qw(
 	have_infinite have_signed_zero have_nan float_id_cmp totalorder
 ); }
 
+no strict "refs";
 my @values = (
 	sub { have_nan ? &{"Data::Float::nan"} : undef },
 	sub { have_infinite ? &{"Data::Float::neg_infinity"} : undef },
@@ -41,3 +45,5 @@ for(my $ia = @values; $ia--; ) {
 		}
 	}
 }
+
+1;

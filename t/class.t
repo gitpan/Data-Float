@@ -1,3 +1,6 @@
+use warnings;
+use strict;
+
 use Test::More tests => 1 + 8*11 + 3*8;
 
 BEGIN { use_ok "Data::Float", qw(
@@ -7,6 +10,7 @@ BEGIN { use_ok "Data::Float", qw(
 	float_is_infinite float_is_nan
 ); }
 
+no strict "refs";
 my %values = (
 	NORMAL => [
 		-1000.0,
@@ -60,3 +64,5 @@ foreach(\&float_class, \&float_is_normal, \&float_is_subnormal,
 		is zpat($tz), $pat;
 	}
 }
+
+1;

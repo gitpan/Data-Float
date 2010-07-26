@@ -1,3 +1,6 @@
+use warnings;
+use strict;
+
 use Test::More tests => 65;
 
 BEGIN { use_ok "Data::Float", qw(
@@ -69,6 +72,7 @@ $r = nextafter(+min_finite(), -9); is zpat($r), zpat(+0.0); ok $r == 0.0;
 
 SKIP: {
 	skip "infinities not available", 8 unless have_infinite;
+	no strict "refs";
 	my $pinf = &{"Data::Float::pos_infinity"};
 	my $ninf = &{"Data::Float::neg_infinity"};
 	ok nextup(   +max_finite())        == $pinf;
@@ -83,6 +87,7 @@ SKIP: {
 
 SKIP: {
 	skip "NaN not available", 5 unless have_nan;
+	no strict "refs";
 	my $nan = &{"Data::Float::nan"};
 	ok float_is_nan(nextup($nan));
 	ok float_is_nan(nextdown($nan));
@@ -90,3 +95,5 @@ SKIP: {
 	ok float_is_nan(nextafter(+1.2, $nan));
 	ok float_is_nan(nextafter($nan, $nan));
 }
+
+1;

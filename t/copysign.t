@@ -1,3 +1,6 @@
+use warnings;
+use strict;
+
 use Test::More tests => 46;
 
 BEGIN { use_ok "Data::Float", qw(
@@ -41,6 +44,7 @@ SKIP: {
 
 SKIP: {
 	skip "infinities not available", 8 unless have_infinite;
+	no strict "refs";
 	my $pinf = &{"Data::Float::pos_infinity"};
 	my $ninf = &{"Data::Float::neg_infinity"};
 	ok copysign($pinf, +5) == $pinf;
@@ -55,8 +59,11 @@ SKIP: {
 
 SKIP: {
 	skip "NaN not available", 3 unless have_nan;
+	no strict "refs";
 	my $nan = &{"Data::Float::nan"};
 	ok float_is_nan(copysign($nan, +5));
 	ok float_is_nan(copysign($nan, $nan));
 	ok abs(copysign(+1.2, $nan)) == 1.2;
 }
+
+1;

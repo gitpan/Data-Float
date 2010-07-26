@@ -1,3 +1,6 @@
+use warnings;
+use strict;
+
 use Test::More tests => 29;
 
 BEGIN { use_ok "Data::Float", qw(
@@ -47,6 +50,7 @@ ok max_integer - (max_integer-1) == 1;
 ok +(min_finite * 0.5) * 2.0 != min_finite;
 
 if(have_signed_zero) {
+	no strict "refs";
 	is sprintf("%+.f%+.f%+.f", 0.0, -0.0, - -0.0), "+0-0+0";
 	my $pos_zero = &{"Data::Float::pos_zero"};
 	my $neg_zero = &{"Data::Float::neg_zero"};
@@ -67,6 +71,7 @@ if(have_signed_zero) {
 }
 
 if(have_infinite) {
+	no strict "refs";
 	ok &{"Data::Float::pos_infinity"} > max_finite;
 	ok &{"Data::Float::neg_infinity"} < -max_finite();
 	ok max_number == &{"Data::Float::pos_infinity"};
@@ -78,6 +83,9 @@ if(have_infinite) {
 
 SKIP: {
 	skip "no NaNs", 1 unless have_nan;
+	no strict "refs";
 	my $nan = &{"Data::Float::nan"};
 	ok $nan != $nan;
 }
+
+1;

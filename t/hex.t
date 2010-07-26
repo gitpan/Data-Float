@@ -1,3 +1,6 @@
+use warnings;
+use strict;
+
 use Test::More tests => 102;
 
 BEGIN { use_ok "Data::Float", qw(
@@ -15,6 +18,7 @@ my %str_opt = (
 
 SKIP: {
 	skip "no infinities", 22 unless have_infinite;
+	no strict "refs";
 	my $pinf = &{"Data::Float::pos_infinity"};
 	my $ninf = &{"Data::Float::neg_infinity"};
 	is float_hex($pinf), "+inf";
@@ -43,6 +47,7 @@ SKIP: {
 
 SKIP: {
 	skip "no NaN", 20 unless have_nan;
+	no strict "refs";
 	is float_hex(&{"Data::Float::nan"}), "nan";
 	is float_hex(&{"Data::Float::nan"}, \%str_opt), "(NAN)";
 	ok float_is_nan(hex_float("nan"));
@@ -142,3 +147,5 @@ is float_hex(+1.90625, { %opt, frac_digits => 0 }), "+0x1p+1";
 like float_hex(1, { exp_digits_range_mod => "ATLEAST" }),
 	qr/\A\+0x1\.0+p\+00+\z/;
 like float_hex(1, { exp_digits => 5 }), qr/\A\+0x1\.0+p\+00000\z/;
+
+1;

@@ -1,3 +1,22 @@
+version 0.010; 2010-07-26
+
+  * use simpler "parent" pragma in place of "base"
+
+  * in documentation, use the term "truth value" instead of the less
+    precise "boolean"
+
+  * check for required Perl version at runtime
+
+  * use full stricture in test suite
+
+  * use full stricture in Build.PL
+
+  * in Build.PL, explicitly declare configure-time requirements
+
+  * remove bogus "exit 0" from Build.PL
+
+  * add MYMETA.yml to .cvsignore
+
 version 0.009; 2008-04-06
 
   * refer to optional constants more carefully in the code, to avoid

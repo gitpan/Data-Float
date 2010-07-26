@@ -172,14 +172,15 @@ See L<perlnumber(1)> for discussion of Perl's numeric semantics.
 
 package Data::Float;
 
+{ use 5.006; }
 use warnings;
 use strict;
 
 use Carp qw(croak);
 
-our $VERSION = "0.009";
+our $VERSION = "0.010";
 
-use base "Exporter";
+use parent "Exporter";
 our @EXPORT_OK = qw(
 	float_class float_is_normal float_is_subnormal float_is_nzfinite
 	float_is_zero float_is_finite float_is_infinite float_is_nan
@@ -198,22 +199,22 @@ our @EXPORT_OK = qw(
 
 =item have_signed_zero
 
-Boolean indicating whether floating point zeroes carry a sign.  If yes,
+Truth value indicating whether floating point zeroes carry a sign.  If yes,
 then there are two floating point zero values: +0.0 and -0.0.  (Perl
 scalars can nevertheless also hold an integer zero, which is unsigned.)
 If no, then there is only one zero value, which is unsigned.
 
 =item have_subnormal
 
-Boolean indicating whether there are subnormal floating point values.
+Truth value indicating whether there are subnormal floating point values.
 
 =item have_infinite
 
-Boolean indicating whether there are infinite floating point values.
+Truth value indicating whether there are infinite floating point values.
 
 =item have_nan
 
-Boolean indicating whether there are NaN floating point values.
+Truth value indicating whether there are NaN floating point values.
 
 It is difficult to reliably generate a NaN in Perl, so in some unlikely
 circumstances it is possible that there might be NaNs that this module
@@ -590,7 +591,7 @@ the string value is completely ignored, so dualvars are not a problem.
 
 =head2 Classification
 
-Each "float_is_" function returns a simple boolean result.
+Each "float_is_" function returns a simple truth value result.
 
 =over
 
@@ -1191,7 +1192,7 @@ sub float_id_cmp($$) {
 =item totalorder(A, B)
 
 This is a comparison function supplying a total ordering of floating point
-values.  A and B must both be floating point values.  Returns a boolean
+values.  A and B must both be floating point values.  Returns a truth value
 indicating whether A is to be sorted before-or-the-same-as B.  That is,
 it is a <= predicate on the total ordering.  The ordering is the same as
 that provided by C<float_id_cmp>: NaNs come first, followed by negative
@@ -1383,7 +1384,8 @@ Andrew Main (Zefram) <zefram@fysh.org>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2006, 2007, 2008 Andrew Main (Zefram) <zefram@fysh.org>
+Copyright (C) 2006, 2007, 2008, 2010
+Andrew Main (Zefram) <zefram@fysh.org>
 
 =head1 LICENSE
 

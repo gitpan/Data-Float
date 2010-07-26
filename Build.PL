@@ -1,28 +1,34 @@
+{ use 5.006; }
 use warnings;
 use strict;
-no strict "subs";
 
 use Module::Build;
 
 Module::Build->new(
 	module_name => "Data::Float",
 	license => "perl",
+	configure_requires => {
+		"Module::Build" => 0,
+		"perl" => "5.006",
+		"strict" => 0,
+		"warnings" => 0,
+	},
 	build_requires => {
-		Module::Build => 0,
-		Test::More => 0,
-		perl => "5.006",
-		strict => 0,
-		warnings => 0,
+		"Module::Build" => 0,
+		"Test::More" => 0,
+		"perl" => "5.006",
+		"strict" => 0,
+		"warnings" => 0,
 	},
 	requires => {
-		Carp => 0,
-		Exporter => 0,
-		base => 0,
-		constant => 0,
-		integer => 0,
-		perl => "5.006",
-		strict => 0,
-		warnings => 0,
+		"Carp" => 0,
+		"Exporter" => 0,
+		"constant" => 0,
+		"integer" => 0,
+		"parent" => 0,
+		"perl" => "5.006",
+		"strict" => 0,
+		"warnings" => 0,
 	},
 	dynamic_config => 0,
 	meta_add => { distribution_type => "module" },
@@ -30,4 +36,4 @@ Module::Build->new(
 	sign => 1,
 )->create_build_script;
 
-exit 0;
+1;

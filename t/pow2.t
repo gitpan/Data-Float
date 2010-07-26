@@ -1,3 +1,6 @@
+use warnings;
+use strict;
+
 use Test::More tests => 25;
 
 BEGIN { use_ok "Data::Float", qw(
@@ -30,3 +33,5 @@ ok mult_pow2(1025.0, -10) == 1.0009765625;
 ok mult_pow2(1.0009765625, 10) == 1025.0;
 ok mult_pow2(0.5, max_finite_exp+1) == pow2(max_finite_exp);
 ok mult_pow2(2.0, min_finite_exp-1) == pow2(min_finite_exp);
+
+1;

@@ -1,3 +1,6 @@
+use warnings;
+use strict;
+
 use Test::More tests => 1 + 4*3 + 2*2 + 5*17;
 
 BEGIN { use_ok "Data::Float", qw(
@@ -24,6 +27,7 @@ SKIP: {
 }
 SKIP: {
 	skip "infinities not available", 4 unless have_infinite;
+	no strict "refs";
 	test_sign(&{"Data::Float::pos_infinity"}, "+", 0);
 	test_sign(&{"Data::Float::neg_infinity"}, "-", 0);
 }
@@ -59,7 +63,9 @@ test_parts(-0.078125, "-", -4, 1.25);
 
 SKIP: {
 	skip "subnormals not available", 5 unless have_subnormal;
+	no strict "refs";
 	test_parts(+3.0*&{"Data::Float::min_finite"},
 		"+", min_normal_exp, mult_pow2(3.0, -significand_bits()));
 }
 
+1;

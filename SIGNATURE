@@ -1,5 +1,5 @@
 This file contains message digests of all files listed in MANIFEST,
-signed via the Module::Signature module, version 0.55.
+signed via the Module::Signature module, version 0.64.
 
 To verify the content in this distribution, first make sure you have
 Module::Signature installed, then type:
@@ -14,28 +14,28 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 2589479b52d4b3ee12dc56f9d2e5bbbaba9dcfea .cvsignore
-SHA1 ae59fe1fdfa95409921c9cdcbaa2623f3076ef15 Build.PL
-SHA1 ae2928d43e84f3cf0e84fc8e8cd7cf3c1cbce4e4 Changes
+SHA1 a647ee7a0b367a12ea5f5b76ebb149ce25ba0390 .cvsignore
+SHA1 22c0b8256338e7f077f6311527c006ca9acfc75b Build.PL
+SHA1 6765395ee1e984c27ba75f40e6a165df88a55c16 Changes
 SHA1 a0baf8aa5977fabc6ba24e0004ecfb9d1d4b6849 MANIFEST
-SHA1 936faa1c8bd34c737b4c33047135a71aa68b22f7 META.yml
-SHA1 cd14ada78fb37a0d926edd86eddcdf7f939de582 Makefile.PL
-SHA1 80756a39812970c7fca4da2d32bc5e3d8ad543ba README
-SHA1 63f9fc46d89c8d1e62f0fed91359fd0362c4dbb3 lib/Data/Float.pm
-SHA1 ce2a2e8e6dac572ffd33843c13dcbff4017f9c62 t/class.t
-SHA1 f6d46c7ebefd8032fdf5d8f2faf9a48d540f83dc t/const.t
-SHA1 e487720128f517f751aa91cf1488a50f5f522be0 t/copysign.t
-SHA1 d984b62d9d370cc4620c5fab73c53b0ed5de2ae9 t/hex.t
-SHA1 fcdc3be4e40ebe31efe14a8265f6d8d82792264b t/id_cmp.t
-SHA1 b6d6f699081e003c45e0255a079f1ff95db64b34 t/nextafter.t
-SHA1 27522de85b9db97181e0f8d8dc6596c283817717 t/parts.t
-SHA1 0e141eecf3ca4903ef38d9413b5403a9ddb0392f t/pod_cvg.t
-SHA1 74a957cd8b93f25672ecc6aa578a671d084dd343 t/pod_syn.t
-SHA1 2f15e822481c093f8f7a23b9b40073934b590492 t/pow2.t
+SHA1 27c8fc9c18ece0d13e2d89948c72e33e46cdb822 META.yml
+SHA1 caae608231ffe78390c76451ade51a7cfc87a9f9 Makefile.PL
+SHA1 754fa448a4bc61e5eedd11119b00abaf18caf906 README
+SHA1 838a0af84b5054cd4046145f0893ecfaec9741c9 lib/Data/Float.pm
+SHA1 46a701139af33ceb60bdcd6bdd098bba93c9da89 t/class.t
+SHA1 8ff388995f49bfa234eb7667943930db20d71d5d t/const.t
+SHA1 356d01d2baf86af1890e9acc29129361bf62cbe1 t/copysign.t
+SHA1 e9b6488e8989b4816cc9c44c9e62da415c4ada2c t/hex.t
+SHA1 71efb1ee1aac4f1c252b9f3886148a6adc3e3b32 t/id_cmp.t
+SHA1 c9d4a7d0d6156649ec6a9ac6281a84999e3b4ba7 t/nextafter.t
+SHA1 e00cf1571fee7e4f0bc753b05366e043abf0d4aa t/parts.t
+SHA1 904d9a4f76525e2303e4b0c168c68230f223c8de t/pod_cvg.t
+SHA1 65c75abdef6f01a5d1588a307f2ddfe2333dc961 t/pod_syn.t
+SHA1 8181874d707c8c1d591df349ab200f99e6613446 t/pow2.t
 -----BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.6 (GNU/Linux)
+Version: GnuPG v1.4.9 (GNU/Linux)
 
-iD8DBQFH+QqoOV9mt2VyAVERArqDAJ4gA5y6SK/JjfUc/NlVVSTrX2ZIHQCggaTj
-IdUjRlb+xd9WSF9/l463LGg=
-=yRQp
+iEYEARECAAYFAkxN7XoACgkQOV9mt2VyAVFmaACbBZ/ectD8JVhCG+BxiDyNzmH/
+jG4AoIet52EsEvFx5LP3lLwVIV3v0s1O
+=4G5m
 -----END PGP SIGNATURE-----
