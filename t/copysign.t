@@ -13,7 +13,7 @@ ok copysign(-1.2, +5) == +1.2;
 ok copysign(+1.2, -5) == -1.2;
 ok copysign(-1.2, -5) == -1.2;
 
-sub zpat($) { my($z) = @_; sprintf("%+.f%+.f%+.f", $z, -$z, - -$z) }
+sub zpat($) { my($z) = @_; my $nz = -$z; sprintf("%+.f%+.f%+.f",$z,$nz,-$nz) }
 my($z, $r);
 
 $z = 0; $r = copysign($z, +5);

@@ -1,7 +1,7 @@
 use warnings;
 use strict;
 
-use Test::More tests => 29;
+use Test::More tests => 30;
 
 BEGIN { use_ok "Data::Float", qw(
 	have_signed_zero have_subnormal have_infinite have_nan
@@ -49,13 +49,16 @@ ok max_integer - (max_integer-1) == 1;
 
 ok +(min_finite * 0.5) * 2.0 != min_finite;
 
+sub zpat($) { my($z) = @_; my $nz = -$z; sprintf("%+.f%+.f%+.f",$z,$nz,-$nz) }
+
 if(have_signed_zero) {
 	no strict "refs";
-	is sprintf("%+.f%+.f%+.f", 0.0, -0.0, - -0.0), "+0-0+0";
+	is zpat(0.0), "+0-0+0";
+	is zpat(-0.0), "-0+0-0";
 	my $pos_zero = &{"Data::Float::pos_zero"};
 	my $neg_zero = &{"Data::Float::neg_zero"};
-	is sprintf("%+.f%+.f", $pos_zero, -$pos_zero), "+0-0";
-	is sprintf("%+.f%+.f", $neg_zero, -$neg_zero), "-0+0";
+	is zpat($pos_zero), "+0-0+0";
+	is zpat($neg_zero), "-0+0-0";
 	{
 		no warnings "void";
 		$pos_zero == $pos_zero;
@@ -63,10 +66,11 @@ if(have_signed_zero) {
 	}
 	$pos_zero = &{"Data::Float::pos_zero"};
 	$neg_zero = &{"Data::Float::neg_zero"};
-	is sprintf("%+.f%+.f", $pos_zero, -$pos_zero), "+0-0";
-	is sprintf("%+.f%+.f", $neg_zero, -$neg_zero), "-0+0";
+	is zpat($pos_zero), "+0-0+0";
+	is zpat($neg_zero), "-0+0-0";
 } else {
-	is sprintf("%+.f%+.f%+.f", 0.0, -0.0, - -0.0), "+0+0+0";
+	is zpat(0.0), "+0+0+0";
+	is zpat(-0.0), "+0+0+0";
 	SKIP: { skip "no signed zeroes", 4; }
 }
 

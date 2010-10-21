@@ -9,7 +9,7 @@ BEGIN { use_ok "Data::Float", qw(
 	float_sign signbit float_parts
 ); }
 
-sub zpat($) { my($z) = @_; sprintf("%+.f%+.f%+.f", $z, -$z, - -$z) }
+sub zpat($) { my($z) = @_; my $nz = -$z; sprintf("%+.f%+.f%+.f",$z,$nz,-$nz) }
 sub test_sign($$$) {
 	my($val, $sign, $is_zero) = @_;
 	my $tval = $val;

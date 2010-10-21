@@ -178,7 +178,7 @@ use strict;
 
 use Carp qw(croak);
 
-our $VERSION = "0.010";
+our $VERSION = "0.011";
 
 use parent "Exporter";
 our @EXPORT_OK = qw(
@@ -518,7 +518,8 @@ if($have_signed_zero) {
 	$neg_zero = -0.0;
 	my $tzero = -0.0;
 	{ no warnings "void"; $tzero == $tzero; }
-	if(sprintf("%e", - -$tzero) =~ /\A-/) {
+	my $ntzero = -$tzero;
+	if(sprintf("%e", -$ntzero) =~ /\A-/) {
 		_mk_constant("pos_zero", $pos_zero);
 		_mk_constant("neg_zero", $neg_zero);
 	} else {
@@ -1306,7 +1307,7 @@ This is an IEEE 754r standard function.
 
 =cut
 
-sub nextdown($) { -nextup(-$_[0]) }
+sub nextdown($) { -nextup(-(my $n = $_[0])) }
 
 =item nextafter(VALUE, DIRECTION)
 

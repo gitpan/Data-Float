@@ -91,7 +91,7 @@ foreach(1023013230.1, 1.23e30, 3.564e-30) {
 	ok hex_float(float_hex($_)) == $_;
 }
 
-sub zpat($) { my($z) = @_; sprintf("%+.f%+.f%+.f", $z, -$z, - -$z) }
+sub zpat($) { my($z) = @_; my $nz = -$z; sprintf("%+.f%+.f%+.f",$z,$nz,-$nz) }
 my $z;
 
 $z = 0; is float_hex($z), "+0.0"; is zpat($z), "+0+0+0";

@@ -24,7 +24,7 @@ name: Data-Float
 provides:
   Data::Float:
     file: lib/Data/Float.pm
-    version: 0.010
+    version: 0.011
 requires:
   Carp: 0
   Exporter: 0
@@ -36,4 +36,4 @@ requires:
   warnings: 0
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.010
+version: 0.011

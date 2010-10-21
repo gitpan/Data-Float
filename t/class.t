@@ -52,7 +52,7 @@ foreach my $class (keys %values) {
 	} }
 }
 
-sub zpat($) { my($z) = @_; sprintf("%+.f%+.f%+.f", $z, -$z, - -$z) }
+sub zpat($) { my($z) = @_; my $nz = -$z; sprintf("%+.f%+.f%+.f",$z,$nz,-$nz) }
 foreach(\&float_class, \&float_is_normal, \&float_is_subnormal,
 	\&float_is_nzfinite, \&float_is_zero, \&float_is_finite,
 	\&float_is_infinite, \&float_is_nan

@@ -1,3 +1,9 @@
+version 0.011; 2010-10-21
+
+  * port to Perl 5.13.6, where changed behaviour of signed zeroes in
+    Perl arithmetic broke nextdown() and nextafter() and caused false
+    test failures for several other functions
+
 version 0.010; 2010-07-26
 
   * use simpler "parent" pragma in place of "base"

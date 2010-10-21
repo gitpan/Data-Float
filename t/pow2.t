@@ -18,7 +18,7 @@ eval { pow2(max_finite_exp+1); }; like $@, qr/\Aexponent [^ \n]+ out of range/;
 ok pow2(min_finite_exp) != 0;
 eval { pow2(min_finite_exp-1); }; like $@, qr/\Aexponent [^ \n]+ out of range/;
 
-sub zpat($) { my($z) = @_; sprintf("%+.f%+.f%+.f", $z, -$z, - -$z) }
+sub zpat($) { my($z) = @_; my $nz = -$z; sprintf("%+.f%+.f%+.f",$z,$nz,-$nz) }
 foreach(0, +0.0, -0.0) {
 	my $z = $_;
 	my $m = mult_pow2($z, 5);
